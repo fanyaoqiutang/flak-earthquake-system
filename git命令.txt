@@ -1,0 +1,7 @@
+拉取最新代码：
+git pull
+
+提交并推送到 GitHub：
+git add .
+git commit -m "写了xx功能（比如：完成用户登录页面）"
+git push
