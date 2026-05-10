@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>地震预警与科普平台</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+        }
+
+        body {
+            background-color: #f5f7fa;
+            padding: 30px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .container {
+            background: white;
+            padding: 25px 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.08);
+            margin-bottom: 25px;
+        }
+
+        h2 {
+            color: #2c3e50;
+            margin-bottom: 18px;
+            font-size: 20px;
+            border-left: 4px solid #409eff;
+            padding-left: 10px;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px 12px;
+            margin: 8px 0;
+            border: 1px solid #dcdfe6;
+            border-radius: 6px;
+            font-size: 14px;
+            outline: none;
+        }
+
+        input:focus {
+            border-color: #409eff;
+        }
+
+        button {
+            background-color: #409eff;
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 6px;
+            margin: 8px 5px 8px 0;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        button:hover {
+            background-color: #338ecc;
+        }
+
+        /* 消息弹窗 */
+        .toast {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.75);
+            color: #fff;
+            padding: 14px 26px;
+            border-radius: 8px;
+            font-size: 15px;
+            z-index: 9999;
+            display: none;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- 普通用户 注册/登录 -->
+    <div class="container">
+        <h2>普通用户 注册 / 登录</h2>
+        <input type="text" id="user_account" placeholder="请输入账号">
+        <input type="password" id="user_pwd" placeholder="请输入密码">
+        <button onclick="userReg()">用户注册</button>
+        <button onclick="userLogin()">用户登录</button>
+    </div>
+
+    <!-- 管理员 注册/登录（带密钥） -->
+    <div class="container">
+        <h2>管理员 注册 / 登录</h2>
+        <input type="text" id="admin_account" placeholder="管理员账号">
+        <input type="password" id="admin_pwd" placeholder="管理员密码">
+        <input type="text" id="admin_key" placeholder="管理机构密钥">
+        <button onclick="adminReg()">管理员注册</button>
+        <button onclick="adminLogin()">管理员登录</button>
+    </div>
+
+    <!-- 上传地震信息 -->
+    <div class="container">
+        <h2>添加地震信息（需管理员登录）</h2>
+        <input type="number" id="province_id" placeholder="省份ID">
+        <input type="text" id="earthquake_time" placeholder="地震时间 例：2026-05-10 20:00:00">
+        <input type="text" id="latitude" placeholder="纬度">
+        <input type="text" id="longitude" placeholder="经度">
+        <input type="text" id="depth" placeholder="深度">
+        <input type="text" id="magnitude" placeholder="震级">
+        <input type="text" id="earthquake_message" placeholder="描述信息">
+        <button onclick="addEarthquake()">添加地震数据</button>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+<script>
+// 弹窗提示
+function showToast(text) {
+    let toast = document.getElementById("toast");
+    toast.innerText = text;
+    toast.style.display = "block";
+    setTimeout(() => toast.style.display = "none", 1800);
+}
+
+// ========== 普通用户 ==========
+// 用户注册
+function userReg() {
+    let acc = document.getElementById("user_account").value.trim();
+    let pwd = document.getElementById("user_pwd").value.trim();
+    if(!acc || !pwd) return showToast("账号密码不能为空");
+
+    fetch("http://127.0.0.1:5000/api/user/register", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({user_account:acc,password:pwd})
+    })
+    .then(res=>res.json())
+    .then(data=>{
+        data.code===200 ? showToast("注册成功") : showToast(data.msg);
+    });
+}
+
+// 用户登录
+function userLogin() {
+    let acc = document.getElementById("user_account").value.trim();
+    let pwd = document.getElementById("user_pwd").value.trim();
+    if(!acc || !pwd) return showToast("账号密码不能为空");
+
+    fetch("http://127.0.0.1:5000/api/user/login", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({user_account:acc,password:pwd})
+    })
+    .then(res=>res.json())
+    .then(data=>{
+        data.code===200 ? showToast("登录成功") : showToast(data.msg);
+    });
+}
+
+// ========== 管理员（带密钥） ==========
+// 管理员注册
+function adminReg() {
+    let acc = document.getElementById("admin_account").value.trim();
+    let pwd = document.getElementById("admin_pwd").value.trim();
+    let key = document.getElementById("admin_key").value.trim();
+    if(!acc || !pwd || !key) return showToast("账号、密码、密钥不能为空");
+
+    fetch("http://127.0.0.1:5000/api/admin/register", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+            admin_account:acc,
+            password:pwd,
+            admin_key:key
+        })
+    })
+    .then(res=>res.json())
+    .then(data=>{
+        data.code===200 ? showToast("管理员注册成功") : showToast(data.msg);
+    });
+}
+
+// 管理员登录
+function adminLogin() {
+    let acc = document.getElementById("admin_account").value.trim();
+    let pwd = document.getElementById("admin_pwd").value.trim();
+    if(!acc || !pwd) return showToast("账号密码不能为空");
+
+    fetch("http://127.0.0.1:5000/api/admin/login", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+            admin_account:acc,
+            password:pwd
+        })
+    })
+    .then(res=>res.json())
+    .then(data=>{
+        data.code===200 ? showToast("管理员登录成功") : showToast(data.msg);
+    });
+}
+
+// ========== 添加地震信息（含重复校验） ==========
+async function addEarthquake() {
+    let province_id = parseInt(document.getElementById("province_id").value);
+    let earthquake_time = document.getElementById("earthquake_time").value.trim();
+    let latitude = parseFloat(document.getElementById("latitude").value);
+    let longitude = parseFloat(document.getElementById("longitude").value);
+    let depth = parseFloat(document.getElementById("depth").value);
+    let magnitude = parseFloat(document.getElementById("magnitude").value);
+    let msg = document.getElementById("earthquake_message").value.trim();
+
+    if(!province_id||!earthquake_time||!latitude||!longitude||!depth||!magnitude){
+        return showToast("请填写完整地震信息");
+    }
+
+    let res = await fetch("http://127.0.0.1:5000/api/earthquake/list");
+    let listData = await res.json();
+    let list = listData.data || [];
+
+    let dup = list.some(item=>
+        item.province_id === province_id &&
+        item.earthquake_time === earthquake_time &&
+        parseFloat(item.magnitude) === magnitude
+    );
+    if(dup) return showToast("该地震数据已存在");
+
+    fetch("http://127.0.0.1:5000/api/admin/earthquake/add", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+            province_id, earthquake_time, latitude, longitude, depth, magnitude,
+            earthquake_message: msg,
+            admin_password: "123456"  // 自动带权限
+        })
+    })
+    .then(res=>res.json())
+    .then(data=>{
+        data.code===200 ? showToast("上传成功") : showToast(data.msg);
+    });
+}
+</script>
+</body>
+</html>
