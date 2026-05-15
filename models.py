@@ -1,4 +1,7 @@
+# 所有的数据库
+
 from flask_sqlalchemy import SQLAlchemy
+from flask_login import UserMixin
 
 db = SQLAlchemy()
 
@@ -13,15 +16,18 @@ class Admin(db.Model):
     __tablename__ = 'admin'
     admin_id = db.Column(db.Integer, primary_key=True)
     admin_account = db.Column(db.String(50), unique=True, nullable=False)
-    password = db.Column(db.String(50), nullable=False)
+    password = db.Column(db.String(200), nullable=False)
     admin_key = db.Column(db.String(50), nullable=False)
 
 # 用户
-class User(db.Model):
+class User(UserMixin, db.Model):
     __tablename__ = 'user'
     user_id = db.Column(db.Integer, primary_key=True)
     user_account = db.Column(db.String(50), unique=True, nullable=False)
-    password = db.Column(db.String(50), nullable=False)
+    password = db.Column(db.String(200), nullable=False)
+
+    def get_id(self):
+        return str(self.user_id)
 
 # 地震信息
 class EarthquakeInfo(db.Model):

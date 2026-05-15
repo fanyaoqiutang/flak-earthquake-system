@@ -1,21 +1,30 @@
 from flask import Flask
-from models import db  # 只导入 db
+from flask_login import LoginManager
+from models import db, User
 from routes import register_routes
-import datetime
 
 app = Flask(__name__)
-app.secret_key = "earthquake_2025"
+app.secret_key = "earthquake_2025_secure_key_change_in_production"
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///test.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)
+
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.session_protection = "strong"
+login_manager.login_message = "请先登录"
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
 register_routes(app)
 
 # 初始化数据
 with app.app_context():
     db.create_all()
 
-    # 在这里面导入！！！ 解决红色 + 报错
     from models import Province, Admin
 
     # 初始化全国省份
@@ -41,16 +50,24 @@ with app.app_context():
         ]
         db.session.add_all(provinces)
 
-    # 初始化默认管理员
+    # 初始化默认管理员（密码需要哈希）
     if not Admin.query.filter_by(admin_account="admin").first():
+        from werkzeug.security import generate_password_hash
+        hashed_pwd = generate_password_hash("123456")
         db.session.add(Admin(
             admin_account="admin",
-            password="123456",
+            password=hashed_pwd,
             admin_key="ADMIN_2025_EARTHQUAKE"
         ))
+        # 初始化默认测试用户（密码需要哈希）
+    if not User.query.filter_by(user_account="testuser").first():
+        from werkzeug.security import generate_password_hash
 
-    db.session.commit()
-
+        hashed_user_pwd = generate_password_hash("123456")
+        db.session.add(User(
+            user_account="testuser",
+            password=hashed_user_pwd
+        ))
     db.session.commit()
 
 if __name__ == '__main__':
