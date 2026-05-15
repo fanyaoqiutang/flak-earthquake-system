@@ -104,8 +104,8 @@
 
     <!-- 上传地震信息 -->
     <div class="container">
-        <h2>添加地震信息（需管理员登录）</h2>
-        <input type="number" id="province_id" placeholder="省份ID">
+        <h2>添加地震信息</h2>
+        <input type="number" id="province_id" placeholder="省份ID 1-5">
         <input type="text" id="earthquake_time" placeholder="地震时间 例：2026-05-10 20:00:00">
         <input type="text" id="latitude" placeholder="纬度">
         <input type="text" id="longitude" placeholder="经度">
@@ -113,6 +113,21 @@
         <input type="text" id="magnitude" placeholder="震级">
         <input type="text" id="earthquake_message" placeholder="描述信息">
         <button onclick="addEarthquake()">添加地震数据</button>
+    </div>
+
+    <!-- 修改删除区域 -->
+    <div class="container">
+        <h2>修改 / 删除 地震信息</h2>
+        <input type="number" id="eq_id" placeholder="地震ID">
+        <input type="number" id="update_province" placeholder="新省份ID">
+        <input type="text" id="update_time" placeholder="新时间">
+        <input type="text" id="update_lat" placeholder="新纬度">
+        <input type="text" id="update_lng" placeholder="新经度">
+        <input type="text" id="update_depth" placeholder="新深度">
+        <input type="text" id="update_mag" placeholder="新震级">
+        <input type="text" id="update_msg" placeholder="新描述">
+        <button onclick="updateEarthquake()">修改地震</button>
+        <button onclick="deleteEarthquake()">删除地震</button>
     </div>
 
     <div class="toast" id="toast"></div>
@@ -140,8 +155,9 @@ function userReg() {
     })
     .then(res=>res.json())
     .then(data=>{
-        data.code===200 ? showToast("注册成功") : showToast(data.msg);
-    });
+        data.code===200 ? showToast("用户注册成功") : showToast(data.msg);
+    })
+    .catch(err => showToast("请求失败，请检查后端服务"));
 }
 
 // 用户登录
@@ -157,11 +173,12 @@ function userLogin() {
     })
     .then(res=>res.json())
     .then(data=>{
-        data.code===200 ? showToast("登录成功") : showToast(data.msg);
-    });
+        data.code===200 ? showToast("用户登录成功") : showToast(data.msg);
+    })
+    .catch(err => showToast("请求失败，请检查后端服务"));
 }
 
-// ========== 管理员（带密钥） ==========
+// ========== 管理员 ==========
 // 管理员注册
 function adminReg() {
     let acc = document.getElementById("admin_account").value.trim();
@@ -181,7 +198,8 @@ function adminReg() {
     .then(res=>res.json())
     .then(data=>{
         data.code===200 ? showToast("管理员注册成功") : showToast(data.msg);
-    });
+    })
+    .catch(err => showToast("请求失败，请检查后端服务"));
 }
 
 // 管理员登录
@@ -200,11 +218,17 @@ function adminLogin() {
     })
     .then(res=>res.json())
     .then(data=>{
-        data.code===200 ? showToast("管理员登录成功") : showToast(data.msg);
-    });
+        if(data.code===200) {
+            localStorage.setItem("admin_token","ADMIN_2025_EARTHQUAKE");
+            showToast("管理员登录成功");
+        } else {
+            showToast(data.msg);
+        }
+    })
+    .catch(err => showToast("请求失败，请检查后端服务"));
 }
 
-// ========== 添加地震信息（含重复校验） ==========
+// ========== 添加地震 ==========
 async function addEarthquake() {
     let province_id = parseInt(document.getElementById("province_id").value);
     let earthquake_time = document.getElementById("earthquake_time").value.trim();
@@ -218,30 +242,75 @@ async function addEarthquake() {
         return showToast("请填写完整地震信息");
     }
 
-    let res = await fetch("http://127.0.0.1:5000/api/earthquake/list");
-    let listData = await res.json();
-    let list = listData.data || [];
+    try {
+        let res = await fetch("http://127.0.0.1:5000/api/earthquake/list");
+        let listData = await res.json();
+        let list = listData.data || [];
 
-    let dup = list.some(item=>
-        item.province_id === province_id &&
-        item.earthquake_time === earthquake_time &&
-        parseFloat(item.magnitude) === magnitude
-    );
-    if(dup) return showToast("该地震数据已存在");
+        let dup = list.some(item=>
+            item.province_id === province_id &&
+            item.earthquake_time === earthquake_time &&
+            parseFloat(item.magnitude) === magnitude
+        );
+        if(dup) return showToast("该地震数据已存在，请勿重复上传");
+    } catch(err) {
+        return showToast("获取地震列表失败");
+    }
 
     fetch("http://127.0.0.1:5000/api/admin/earthquake/add", {
         method:"POST",
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({
-            province_id, earthquake_time, latitude, longitude, depth, magnitude,
-            earthquake_message: msg,
-            admin_password: "123456"  // 自动带权限
+            province_id,earthquake_time,latitude,longitude,depth,magnitude,earthquake_message:msg,
+            admin_token:"ADMIN_2025_EARTHQUAKE"
         })
     })
     .then(res=>res.json())
     .then(data=>{
-        data.code===200 ? showToast("上传成功") : showToast(data.msg);
-    });
+        data.code===200 ? showToast("地震数据上传成功") : showToast(data.msg);
+    })
+    .catch(err => showToast("请求失败，请检查服务是否启动"));
+}
+
+// ========== 修改地震 ==========
+function updateEarthquake(){
+    let id = document.getElementById("eq_id").value;
+    if(!id) return showToast("请输入要修改的地震ID");
+
+    let obj = {
+        earthquake_id: id,
+        province_id: document.getElementById("update_province").value || undefined,
+        earthquake_time: document.getElementById("update_time").value || undefined,
+        latitude: document.getElementById("update_lat").value || undefined,
+        longitude: document.getElementById("update_lng").value || undefined,
+        depth: document.getElementById("update_depth").value || undefined,
+        magnitude: document.getElementById("update_mag").value || undefined,
+        earthquake_message: document.getElementById("update_msg").value || undefined,
+        admin_token: "ADMIN_2025_EARTHQUAKE"
+    };
+    fetch("http://127.0.0.1:5000/api/admin/earthquake/update",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify(obj)
+    })
+    .then(r=>r.json())
+    .then(d=>showToast(d.msg))
+    .catch(()=>showToast("请求失败"));
+}
+
+// ========== 删除地震 ==========
+function deleteEarthquake(){
+    let id = document.getElementById("eq_id").value;
+    if(!id) return showToast("请输入地震ID");
+
+    fetch("http://127.0.0.1:5000/api/admin/earthquake/delete",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({earthquake_id:id, admin_token:"ADMIN_2025_EARTHQUAKE"})
+    })
+    .then(r=>r.json())
+    .then(d=>showToast(d.msg))
+    .catch(()=>showToast("请求失败"));
 }
 </script>
 </body>
