@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask,render_template
 from flask_login import LoginManager
 from models import db, User
 from routes import register_routes
@@ -18,6 +18,11 @@ login_manager.login_message = "请先登录"
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
+
+
+@app.route('/')
+def login():
+    return render_template('LOGIN.html')
 
 register_routes(app)
 
