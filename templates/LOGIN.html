@@ -100,6 +100,38 @@
             display: none;
             white-space: nowrap;
         }
+
+        /* 地震列表样式 */
+        .eq-list {
+            margin-top: 15px;
+            max-height: 380px;
+            overflow-y: auto;
+            border-top: 1px solid #eee;
+            padding-top: 10px;
+        }
+        .eq-item {
+            padding: 12px;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .eq-item:last-child {
+            border-bottom: none;
+        }
+        .eq-title {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 4px;
+        }
+        .eq-meta {
+            color: #7f8c8d;
+            font-size: 12px;
+        }
+        .empty-tip {
+            text-align: center;
+            color: #999;
+            padding: 20px;
+        }
     </style>
 </head>
 
@@ -155,6 +187,15 @@
         <button class="danger" onclick="deleteEarthquake()">删除地震</button>
     </div>
 
+    <!-- ====================== 新增：地震消息列表 ====================== -->
+    <div class="container">
+        <h2>地震消息列表 📋</h2>
+        <button onclick="loadEarthquakeList()" style="background:#67C23A">刷新列表</button>
+        <div id="eq_list_container" class="eq-list">
+            <div class="empty-tip">点击刷新加载数据...</div>
+        </div>
+    </div>
+
     <div class="toast" id="toast"></div>
 
 <script>
@@ -175,6 +216,9 @@ window.onload = function() {
         currentAdminToken = savedAdminToken;
         updateAdminStatus(localStorage.getItem("admin_account") || "已登录");
     }
+
+    // 页面打开自动加载地震列表
+    loadEarthquakeList();
 };
 
 // 弹窗提示
@@ -203,6 +247,44 @@ function updateAdminStatus(text) {
     } else {
         statusDiv.innerHTML = '';
     }
+}
+
+// ====================== 新增：加载地震列表 ======================
+function loadEarthquakeList() {
+    const container = document.getElementById("eq_list_container");
+    container.innerHTML = `<div class="empty-tip">加载中...</div>`;
+
+    fetch("http://127.0.0.1:5000/api/earthquake/list")
+    .then(res => res.json())
+    .then(data => {
+        if (data.code !== 200 || !data.data || data.data.length === 0) {
+            container.innerHTML = `<div class="empty-tip">暂无地震数据</div>`;
+            return;
+        }
+
+        let html = '';
+        data.data.forEach(item => {
+            html += `
+            <div class="eq-item">
+                <div class="eq-title">
+                    ${item.province_name} · ${item.magnitude}级
+                </div>
+                <div class="eq-meta">
+                    时间：${item.earthquake_time} | ID：${item.earthquake_id}<br>
+                    经纬度：${item.latitude}, ${item.longitude} | 深度：${item.depth}km<br>
+                    描述：${item.earthquake_message || '无'}
+                </div>
+            </div>
+            `;
+        });
+
+        container.innerHTML = html;
+        showToast(`加载成功，共 ${data.total} 条记录`);
+    })
+    .catch(err => {
+        container.innerHTML = `<div class="empty-tip">加载失败，请检查后端</div>`;
+        showToast("地震列表加载失败");
+    });
 }
 
 // ========== 普通用户 ==========
@@ -426,7 +508,8 @@ async function addEarthquake() {
     .then(data=>{
         if(data.code===200) {
             showToast("地震数据上传成功");
-            // 清空表单
+            // 自动刷新列表
+            loadEarthquakeList();
             document.getElementById("province_id").value = "";
             document.getElementById("earthquake_time").value = "";
             document.getElementById("latitude").value = "";
@@ -472,6 +555,7 @@ function updateEarthquake(){
     .then(d=>{
         showToast(d.msg);
         if(d.code === 200) {
+            loadEarthquakeList();
             document.getElementById("eq_id").value = "";
         }
     })
@@ -500,6 +584,7 @@ function deleteEarthquake(){
     .then(d=>{
         showToast(d.msg);
         if(d.code === 200) {
+            loadEarthquakeList();
             document.getElementById("eq_id").value = "";
         }
     })

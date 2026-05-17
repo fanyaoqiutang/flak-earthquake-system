@@ -78,6 +78,9 @@ def register_routes(app):
             }
         })
 
+
+
+
     @app.route('/api/admin/logout', methods=['POST'])
     def admin_logout():
         session.clear()
