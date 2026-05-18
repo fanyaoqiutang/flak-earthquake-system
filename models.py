@@ -1,5 +1,5 @@
 # 所有的数据库
-
+import datetime
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 
@@ -63,3 +63,14 @@ class ChatMessage(db.Model):
     user_id = db.Column(db.Integer, nullable=False)
     content = db.Column(db.Text, nullable=False)
     create_time = db.Column(db.DateTime, default=db.func.now())
+
+#   反馈数据表
+class UserFeedback(db.Model):
+    __tablename__ = "user_feedback"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.ForeignKey('user.user_id'), nullable=False)
+    feedback_type = db.Column(db.String(30))
+    content = db.Column(db.Text)
+    priority = db.Column(db.String(10), default="中")
+    status = db.Column(db.String(20), default="未处理")
+    submit_time = db.Column(db.DateTime, default=datetime.datetime.now)
