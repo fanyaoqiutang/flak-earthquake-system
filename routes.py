@@ -15,7 +15,7 @@ def register_routes(app):
         resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
         return resp
 
-    # ====================== 管理员注册、登录 ======================
+    # ====================== 管理员注册 ======================
     @app.route('/api/admin/register', methods=['POST'])
     def admin_register():
         data = request.get_json()
@@ -47,7 +47,7 @@ def register_routes(app):
         db.session.add(new_admin)
         db.session.commit()
         return jsonify({"code": 200, "msg": "注册成功"})
-
+    # ======================= 管理员登录 ======================
     @app.route('/api/admin/login', methods=['POST'])
     def admin_login():
         data = request.get_json()
@@ -78,14 +78,12 @@ def register_routes(app):
             }
         })
 
-
-
-
+    # ======================管理员登出======================
     @app.route('/api/admin/logout', methods=['POST'])
     def admin_logout():
         session.clear()
         return jsonify({"code": 200, "msg": "退出成功"})
-
+    # ====================== 获取当前登录信息 ======================
     @app.route('/api/admin/info', methods=['GET'])
     def admin_info():
         if not session.get('is_admin'):
@@ -99,7 +97,7 @@ def register_routes(app):
             }
         })
 
-    # ====================== 用户 ======================
+    # ====================== 用户注册 ======================
     @app.route('/api/user/register', methods=['POST'])
     def user_register():
         data = request.get_json()
@@ -123,7 +121,7 @@ def register_routes(app):
         db.session.add(u)
         db.session.commit()
         return jsonify({"code": 200, "msg": "注册成功"})
-
+    # ====================== 用户登录 ======================
     @app.route('/api/user/login', methods=['POST'])
     def user_login():
         data = request.get_json()
@@ -154,7 +152,7 @@ def register_routes(app):
                 "user_token": token
             }
         })
-
+    # ====================== 用户登出 ======================
     @app.route('/api/user/logout', methods=['POST'])
     @login_required
     def user_logout():
@@ -162,6 +160,7 @@ def register_routes(app):
         session.clear()
         return jsonify({"code": 200, "msg": "退出成功"})
 
+    # ====================== 获取当前用户登录状态 ======================
     @app.route('/api/user/info', methods=['GET'])
     @login_required
     def user_info():
@@ -173,7 +172,7 @@ def register_routes(app):
             }
         })
 
-    # ====================== 地震 增删改查 ======================
+    # ====================== 身份验证 ======================
     def verify_admin():
         """验证管理员权限"""
         if session.get('is_admin'):
@@ -186,7 +185,7 @@ def register_routes(app):
             return True
 
         return False
-
+    # ====================== 添加地震信息 ======================
     @app.route('/api/admin/earthquake/add', methods=['POST'])
     def add_eq():
         if not verify_admin():
@@ -235,7 +234,7 @@ def register_routes(app):
 
         return jsonify({"code": 200, "msg": "添加成功"})
 
-
+     # ====================== 修改地震信息 ======================
     @app.route('/api/admin/earthquake/update', methods=['POST'])
     def update_eq():
         if not verify_admin():
@@ -295,6 +294,7 @@ def register_routes(app):
         db.session.commit()
         return jsonify({"code": 200, "msg": "修改成功"})
 
+    # ====================== 删除地震信息 ======================
     @app.route('/api/admin/earthquake/delete', methods=['POST'])
     def delete_eq():
         if not verify_admin():
@@ -313,7 +313,7 @@ def register_routes(app):
         db.session.commit()
         return jsonify({"code": 200, "msg": "删除成功"})
 
-
+    # ====================== 列出地震信息 ======================
     @app.route('/api/earthquake/list', methods=['GET'])
     def list_eq():
         province_id = request.args.get('province_id')
