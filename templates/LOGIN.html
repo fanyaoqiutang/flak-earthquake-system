@@ -591,5 +591,71 @@ function deleteEarthquake(){
     .catch(()=>showToast("请求失败"));
 }
 </script>
+<div class="container">
+    <h2>测试：订阅省份 & 查看预警</h2>
+    <!-- 👇 这里 ID 改名了 -->
+    <input type="number" id="sub_province_id" placeholder="输入省份ID（如：21 四川省）" style="width:180px;">
+    <button onclick="subscribe()">订阅该省份</button>
+    <button onclick="showMySubscriptions()">我的订阅</button>
+    <button onclick="showAlerts()">我的预警</button>
+    <div id="result" style="margin-top:10px; font-size:14px; white-space:pre-wrap;"></div>
+</div>
+
+<script>
+function subscribe() {
+    // 👇 这里也对应改了
+    let pid = document.getElementById("sub_province_id").value.trim();
+
+    if (!pid) {
+        showToast("请输入省份ID");
+        return;
+    }
+
+    fetch("http://127.0.0.1:5000/api/user/subscribe", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ province_id: pid }),
+        credentials: "include"
+    })
+    .then(res => res.json())
+    .then(data => {
+        showToast(data.msg);
+        document.getElementById("result").innerText = data.msg;
+    })
+    .catch(err => {
+        showToast("订阅请求失败");
+    });
+}
+
+function showMySubscriptions() {
+    fetch("http://127.0.0.1:5000/api/user/subscriptions", {
+        credentials: "include"
+    }).then(res=>res.json()).then(data=>{
+        let txt = "我的订阅：\n";
+        if(data.data){
+            data.data.forEach(item=>{
+                txt += item.province_name + "\n";
+            });
+        }
+        document.getElementById("result").innerText = txt;
+    });
+}
+
+function showAlerts() {
+    fetch("http://127.0.0.1:5000/api/user/alerts", {
+        credentials: "include"
+    }).then(res=>res.json()).then(data=>{
+        let txt = "我的预警：\n";
+        if(data.data){
+            data.data.forEach(item=>{
+                txt += item.province_name + " " + item.magnitude + "级\n";
+            });
+        }
+        document.getElementById("result").innerText = txt;
+    });
+}
+</script>
 </body>
 </html>
