@@ -10,6 +10,7 @@ app = Flask(__name__)
 app.secret_key = "earthquake_2025_secure_key_change_in_production"
 app.config['SESSION_COOKIE_SAMESITE'] = None
 app.config['SESSION_COOKIE_SECURE'] = False
+# 通过URL链接数据库
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///test.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -32,7 +33,7 @@ def load_user(user_id):
 def login():
     return render_template('LOGIN.html')
 
-# 注册所有蓝图（替换原来的 register_routes）
+# 注册所有蓝图,用于模块划分
 app.register_blueprint(admin_bp)
 app.register_blueprint(user_bp)
 app.register_blueprint(common_bp)
@@ -45,7 +46,7 @@ def after_request(resp):
     resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
     return resp
 
-# 初始化数据（你原来的代码不动）
+# 初始化数据
 with app.app_context():
     db.create_all()
     from models import Province
@@ -69,15 +70,19 @@ with app.app_context():
             Province(province_name="宁夏回族自治区"), Province(province_name="新疆维吾尔自治区"),
             Province(province_name="香港特别行政区"), Province(province_name="澳门特别行政区")
         ]
+        # 向数据库添加多条记录
         db.session.add_all(provinces)
+        # filter_by()以关键字形式根据指定规则过滤记录，返回新产生的查询对象，并返回符合条件的第一条记录
     if not Admin.query.filter_by(admin_account="admin").first():
         from werkzeug.security import generate_password_hash
         hashed_pwd = generate_password_hash("123456")
+        # 增加一条记录
         db.session.add(Admin(admin_account="admin", password=hashed_pwd, admin_key="ADMIN_2025_EARTHQUAKE"))
     if not User.query.filter_by(user_account="testuser").first():
         from werkzeug.security import generate_password_hash
         hashed_user_pwd = generate_password_hash("123456")
         db.session.add(User(user_account="testuser", password=hashed_user_pwd))
+    # 将会话提交至数据库
     db.session.commit()
 
 if __name__ == '__main__':

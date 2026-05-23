@@ -19,7 +19,6 @@ def add_admin_log(admin_id, operation, target_earthquake_id=None, remark=""):
         admin_id=admin_id,
         operation=operation,
         target_earthquake_id=target_earthquake_id,
-        remark=remark
     )
     db.session.add(log)
     db.session.commit()

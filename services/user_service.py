@@ -2,7 +2,7 @@ from flask import request, jsonify, session
 from flask_login import login_user, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 import secrets
-from models import db, User, UserSubscribeProvince, UserEarthquakeAlert, Province, EarthquakeInfo
+from models import db, User, UserSubscribeProvince, UserEarthquakeAlert, Province, EarthquakeInfo,UserFeedback,ChatMessage
 
 def svc_user_register():
     data = request.get_json(force=True)
@@ -126,3 +126,57 @@ def svc_mark_all_alerts_read():
         a.is_read = True
     db.session.commit()
     return jsonify({"code": 200, "msg": "全部已读"})
+
+# ====================== 用户反馈 ======================
+def svc_submit_feedback(user_id, data):
+    feedback_type = data.get("feedback_type")
+    content = data.get("content")
+    priority = data.get("priority", "中")
+
+    if not feedback_type or not content:
+        return jsonify({"code": 400, "msg": "反馈类型和内容不能为空"}), 400
+
+    fb = UserFeedback(
+        user_id=user_id,
+        feedback_type=feedback_type,
+        content=content,
+        priority=priority
+    )
+    db.session.add(fb)
+    db.session.commit()
+
+    return jsonify({"code": 200, "msg": "反馈提交成功"})
+
+# ====================== 发送聊天消息 ======================
+def svc_send_chat_message(user_id, data):
+    content = data.get("content", "").strip()
+
+    if not content:
+        return jsonify({"code": 400, "msg": "消息不能为空"}), 400
+
+    msg = ChatMessage(
+        user_id=user_id,
+        content=content
+    )
+    db.session.add(msg)
+    db.session.commit()
+
+    return jsonify({"code": 200, "msg": "发送成功"})
+
+# ====================== 获取聊天记录 ======================
+def svc_get_chat_list():
+    messages = ChatMessage.query.order_by(ChatMessage.create_time).all()
+    res = []
+
+    for m in messages:
+        user = User.query.get(m.user_id)
+        username = user.user_account if user else "未知用户"
+
+        res.append({
+            "user_id": m.user_id,
+            "username": username,
+            "content": m.content,
+            "create_time": m.create_time.strftime("%Y-%m-%d %H:%M:%S")
+        })
+
+    return jsonify({"code": 200, "data": res})

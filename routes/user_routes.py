@@ -1,9 +1,10 @@
-from flask import Blueprint
-from flask_login import login_required
+from flask import Blueprint, request, jsonify, session
+from flask_login import login_required, current_user
 from services.user_service import *
 
 user_bp = Blueprint("user", __name__, url_prefix="/api/user")
 
+# ====================== 原有接口 ======================
 @user_bp.route("/register", methods=["POST"])
 def user_register():
     return svc_user_register()
@@ -56,3 +57,22 @@ def read(alert_id):
 @login_required
 def read_all():
     return svc_mark_all_alerts_read()
+
+# ====================== ✅ 用户反馈（必须登录） ======================
+@user_bp.route("/feedback", methods=["POST"])
+@login_required  # 必须登录
+def user_feedback():
+    data = request.get_json()
+    return svc_submit_feedback(current_user.user_id, data)
+
+# ====================== ✅ 公共聊天室：发送消息（必须登录） ======================
+@user_bp.route("/chat", methods=["POST"])
+@login_required  # 必须登录
+def send_chat():
+    data = request.get_json()
+    return svc_send_chat_message(current_user.user_id, data)
+# ====================== ✅ 公共聊天室：获取所有历史消息 ======================
+@user_bp.route("/chat/list", methods=["GET"])
+@login_required  # 必须登录才能看聊天记录
+def chat_list():
+    return svc_get_chat_list()

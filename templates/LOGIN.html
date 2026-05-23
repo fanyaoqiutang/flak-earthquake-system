@@ -11,81 +11,92 @@
             box-sizing: border-box;
             font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
         }
-
         body {
             background-color: #f5f7fa;
-            padding: 30px;
-            max-width: 900px;
+            padding: 20px;
+        }
+        .page-wrap {
+            display: flex;
+            gap: 20px;
+            max-width: 1400px;
             margin: 0 auto;
         }
-
-        .container {
-            background: white;
-            padding: 25px 30px;
+        /* 左侧侧边栏 */
+        .sidebar {
+            width: 320px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        /* 右侧主内容区 */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .card {
+            background: #fff;
+            padding: 20px;
             border-radius: 12px;
             box-shadow: 0 2px 15px rgba(0,0,0,0.08);
-            margin-bottom: 25px;
         }
-
         h2 {
             color: #2c3e50;
-            margin-bottom: 18px;
-            font-size: 20px;
+            margin-bottom: 15px;
+            font-size: 18px;
             border-left: 4px solid #409eff;
             padding-left: 10px;
         }
-
-        input {
+        input, select, textarea {
             width: 100%;
-            padding: 10px 12px;
-            margin: 8px 0;
+            padding: 9px 12px;
+            margin: 6px 0;
             border: 1px solid #dcdfe6;
             border-radius: 6px;
             font-size: 14px;
             outline: none;
         }
-
-        input:focus {
+        input:focus, select:focus, textarea:focus {
             border-color: #409eff;
         }
-
         button {
             background-color: #409eff;
             color: white;
             border: none;
-            padding: 10px 18px;
+            padding: 8px 14px;
             border-radius: 6px;
-            margin: 8px 5px 8px 0;
+            margin: 6px 4px 6px 0;
             cursor: pointer;
             font-size: 14px;
         }
-
         button:hover {
             background-color: #338ecc;
         }
-
         button.danger {
             background-color: #f56c6c;
         }
-
         button.danger:hover {
             background-color: #e05555;
         }
-
+        button.success {
+            background-color: #67C23A;
+        }
+        button.success:hover {
+            background-color: #55a830;
+        }
         .status {
-            margin-top: 10px;
-            padding: 8px;
+            margin-top: 8px;
+            padding: 6px;
             border-radius: 4px;
             font-size: 13px;
         }
-
         .status.logged-in {
             background-color: #f0f9ff;
             color: #409eff;
             border: 1px solid #d9ecff;
         }
-
-        /* 消息弹窗 */
         .toast {
             position: fixed;
             top: 50%;
@@ -98,562 +109,407 @@
             font-size: 15px;
             z-index: 9999;
             display: none;
-            white-space: nowrap;
         }
-
-        /* 地震列表样式 */
         .eq-list {
-            margin-top: 15px;
-            max-height: 380px;
+            max-height: 320px;
             overflow-y: auto;
-            border-top: 1px solid #eee;
-            padding-top: 10px;
+            margin-top: 10px;
         }
         .eq-item {
-            padding: 12px;
+            padding: 10px;
             border-bottom: 1px solid #f0f0f0;
             font-size: 13px;
             line-height: 1.5;
-        }
-        .eq-item:last-child {
-            border-bottom: none;
-        }
-        .eq-title {
-            font-weight: bold;
-            color: #2c3e50;
-            margin-bottom: 4px;
-        }
-        .eq-meta {
-            color: #7f8c8d;
-            font-size: 12px;
         }
         .empty-tip {
             text-align: center;
             color: #999;
             padding: 20px;
         }
+        #chat_box {
+            height: 180px;
+            border: 1px solid #eee;
+            padding: 10px;
+            overflow-y: scroll;
+            margin-bottom: 10px;
+            border-radius: 6px;
+        }
+        .row-group {
+            display: flex;
+            gap: 15px;
+        }
+        .row-group .card {
+            flex: 1;
+        }
     </style>
 </head>
-
 <body>
-    <!-- 普通用户 注册/登录 -->
-    <div class="container">
-        <h2>普通用户 注册 / 登录</h2>
-        <input type="text" id="user_account" placeholder="请输入账号（3-20位）">
-        <input type="password" id="user_pwd" placeholder="请输入密码（至少6位）">
-        <button onclick="userReg()">用户注册</button>
-        <button onclick="userLogin()">用户登录</button>
-        <button class="danger" onclick="userLogout()">用户登出</button>
-        <div id="user_status"></div>
-    </div>
+<div class="page-wrap">
+    <!-- 左侧侧边栏 -->
+    <div class="sidebar">
+        <!-- 用户登录 -->
+        <div class="card">
+            <h2>普通用户登录</h2>
+            <input type="text" id="user_account" placeholder="账号">
+            <input type="password" id="user_pwd" placeholder="密码">
+            <button onclick="userReg()">注册</button>
+            <button onclick="userLogin()">登录</button>
+            <button class="danger" onclick="userLogout()">登出</button>
+            <div id="user_status"></div>
+        </div>
 
-    <!-- 管理员 注册/登录（带密钥） -->
-    <div class="container">
-        <h2>管理员 注册 / 登录</h2>
-        <input type="text" id="admin_account" placeholder="管理员账号">
-        <input type="password" id="admin_pwd" placeholder="管理员密码（至少6位）">
-        <input type="text" id="admin_key" placeholder="管理机构密钥">
-        <button onclick="adminReg()">管理员注册</button>
-        <button onclick="adminLogin()">管理员登录</button>
-        <button class="danger" onclick="adminLogout()">管理员登出</button>
-        <div id="admin_status"></div>
-    </div>
+        <!-- 管理员登录 -->
+        <div class="card">
+            <h2>管理员操作</h2>
+            <input type="text" id="admin_account" placeholder="管理员账号">
+            <input type="password" id="admin_pwd" placeholder="密码">
+            <input type="text" id="admin_key" placeholder="管理密钥">
+            <button onclick="adminReg()">注册</button>
+            <button onclick="adminLogin()">登录</button>
+            <button class="danger" onclick="adminLogout()">登出</button>
+            <div id="admin_status"></div>
+        </div>
 
-    <!-- 上传地震信息 -->
-    <div class="container">
-        <h2>添加地震信息</h2>
-        <input type="number" id="province_id" placeholder="省份ID 1-34">
-        <input type="text" id="earthquake_time" placeholder="地震时间 例：2026-05-10 20:00:00">
-        <input type="text" id="latitude" placeholder="纬度">
-        <input type="text" id="longitude" placeholder="经度">
-        <input type="text" id="depth" placeholder="深度（千米）">
-        <input type="text" id="magnitude" placeholder="震级">
-        <input type="text" id="earthquake_message" placeholder="描述信息">
-        <button onclick="addEarthquake()">添加地震数据</button>
-    </div>
-
-    <!-- 修改删除区域 -->
-    <div class="container">
-        <h2>修改 / 删除 地震信息</h2>
-        <input type="number" id="eq_id" placeholder="地震ID">
-        <input type="number" id="update_province" placeholder="新省份ID">
-        <input type="text" id="update_time" placeholder="新时间">
-        <input type="text" id="update_lat" placeholder="新纬度">
-        <input type="text" id="update_lng" placeholder="新经度">
-        <input type="text" id="update_depth" placeholder="新深度">
-        <input type="text" id="update_mag" placeholder="新震级">
-        <input type="text" id="update_msg" placeholder="新描述">
-        <button onclick="updateEarthquake()">修改地震</button>
-        <button class="danger" onclick="deleteEarthquake()">删除地震</button>
-    </div>
-
-    <!-- ====================== 新增：地震消息列表 ====================== -->
-    <div class="container">
-        <h2>地震消息列表 📋</h2>
-        <button onclick="loadEarthquakeList()" style="background:#67C23A">刷新列表</button>
-        <div id="eq_list_container" class="eq-list">
-            <div class="empty-tip">点击刷新加载数据...</div>
+        <!-- 订阅预警 -->
+        <div class="card">
+            <h2>订阅与预警</h2>
+            <input type="number" id="sub_province_id" placeholder="省份ID">
+            <button onclick="subscribe()">订阅省份</button>
+            <button onclick="showMySubscriptions()">我的订阅</button>
+            <button onclick="showAlerts()">查看预警</button>
+            <div id="result" style="margin-top:10px;font-size:14px;"></div>
         </div>
     </div>
 
-    <div class="toast" id="toast"></div>
+    <!-- 右侧主内容区 -->
+    <div class="main-content">
+        <!-- 地震数据展示 -->
+        <div class="card">
+            <h2>地震消息列表</h2>
+            <button class="success" onclick="loadEarthquakeList()">刷新数据</button>
+            <div id="eq_list_container" class="eq-list">
+                <div class="empty-tip">点击刷新加载数据</div>
+            </div>
+        </div>
 
+        <!-- 地震增删改 -->
+        <div class="row-group">
+            <div class="card">
+                <h2>新增地震信息</h2>
+                <input type="number" id="province_id" placeholder="省份ID">
+                <input type="text" id="earthquake_time" placeholder="地震时间">
+                <input type="text" id="latitude" placeholder="纬度">
+                <input type="text" id="longitude" placeholder="经度">
+                <input type="text" id="depth" placeholder="深度">
+                <input type="text" id="magnitude" placeholder="震级">
+                <input type="text" id="earthquake_message" placeholder="描述信息">
+                <button onclick="addEarthquake()">提交新增</button>
+            </div>
+            <div class="card">
+                <h2>编辑地震信息</h2>
+                <input type="number" id="eq_id" placeholder="目标地震ID">
+                <input type="number" id="update_province" placeholder="新省份ID">
+                <input type="text" id="update_time" placeholder="新时间">
+                <input type="text" id="update_lat" placeholder="新纬度">
+                <input type="text" id="update_lng" placeholder="新经度">
+                <input type="text" id="update_depth" placeholder="新深度">
+                <input type="text" id="update_mag" placeholder="新震级">
+                <input type="text" id="update_msg" placeholder="新描述">
+                <button onclick="updateEarthquake()">修改</button>
+                <button class="danger" onclick="deleteEarthquake()">删除</button>
+            </div>
+        </div>
+
+        <!-- 聊天+反馈并排 -->
+        <div class="row-group">
+            <div class="card">
+                <h2>公共聊天室</h2>
+                <div id="chat_box"></div>
+                <input id="chat_msg" type="text" placeholder="输入消息">
+                <button onclick="sendChat()">发送消息</button>
+            </div>
+            <div class="card">
+                <h2>用户反馈</h2>
+                <select id="fb_type">
+                    <option value="故障问题">故障问题</option>
+                    <option value="功能建议">功能建议</option>
+                    <option value="投诉">投诉</option>
+                </select>
+                <select id="fb_priority">
+                    <option value="低">低</option>
+                    <option value="中" selected>中</option>
+                    <option value="高">高</option>
+                </select>
+                <textarea id="fb_content" rows="5" placeholder="填写反馈内容"></textarea>
+                <button onclick="submitFeedback()">提交反馈</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
 <script>
 let currentUserToken = null;
 let currentAdminToken = null;
 
-// 页面加载时恢复登录状态
-window.onload = function() {
-    const savedUserToken = localStorage.getItem("user_token");
-    const savedAdminToken = localStorage.getItem("admin_token");
-
-    if (savedUserToken) {
-        currentUserToken = savedUserToken;
-        updateUserStatus(localStorage.getItem("user_account") || "已登录");
-    }
-
-    if (savedAdminToken) {
-        currentAdminToken = savedAdminToken;
-        updateAdminStatus(localStorage.getItem("admin_account") || "已登录");
-    }
-
-    // 页面打开自动加载地震列表
+window.onload = function () {
+    const u = localStorage.getItem("user_token");
+    const a = localStorage.getItem("admin_token");
+    if (u) { currentUserToken = u; updateUserStatus(localStorage.getItem("user_account")); }
+    if (a) { currentAdminToken = a; updateAdminStatus(localStorage.getItem("admin_account")); }
     loadEarthquakeList();
+    loadChat();
+    setInterval(loadChat, 3000);
 };
 
-// 弹窗提示
 function showToast(text) {
-    let toast = document.getElementById("toast");
-    toast.innerText = text;
-    toast.style.display = "block";
-    setTimeout(() => toast.style.display = "none", 1800);
+    let t = document.getElementById("toast");
+    t.innerText = text;
+    t.style.display = "block";
+    setTimeout(() => t.style.display = "none", 1800);
 }
 
-// 更新用户状态显示
 function updateUserStatus(text) {
-    const statusDiv = document.getElementById("user_status");
-    if (text) {
-        statusDiv.innerHTML = `<div class="status logged-in">✓ ${text}</div>`;
-    } else {
-        statusDiv.innerHTML = '';
-    }
+    let s = document.getElementById("user_status");
+    s.innerHTML = text ? `<div class="status logged-in">✓ ${text}</div>` : "";
 }
 
-// 更新管理员状态显示
 function updateAdminStatus(text) {
-    const statusDiv = document.getElementById("admin_status");
-    if (text) {
-        statusDiv.innerHTML = `<div class="status logged-in">✓ ${text}</div>`;
-    } else {
-        statusDiv.innerHTML = '';
-    }
+    let s = document.getElementById("admin_status");
+    s.innerHTML = text ? `<div class="status logged-in">✓ ${text}</div>` : "";
 }
 
-// ====================== 新增：加载地震列表 ======================
+// ========================== 地震列表 ==========================
 function loadEarthquakeList() {
-    const container = document.getElementById("eq_list_container");
-    container.innerHTML = `<div class="empty-tip">加载中...</div>`;
-
     fetch("http://127.0.0.1:5000/api/earthquake/list")
     .then(res => res.json())
     .then(data => {
-        if (data.code !== 200 || !data.data || data.data.length === 0) {
-            container.innerHTML = `<div class="empty-tip">暂无地震数据</div>`;
+        let c = document.getElementById("eq_list_container");
+        if (!data.data || data.data.length === 0) {
+            c.innerHTML = `<div class="empty-tip">暂无数据</div>`;
             return;
         }
-
-        let html = '';
+        let html = "";
         data.data.forEach(item => {
             html += `
             <div class="eq-item">
-                <div class="eq-title">
-                    ${item.province_name} · ${item.magnitude}级
-                </div>
-                <div class="eq-meta">
-                    时间：${item.earthquake_time} | ID：${item.earthquake_id}<br>
-                    经纬度：${item.latitude}, ${item.longitude} | 深度：${item.depth}km<br>
-                    描述：${item.earthquake_message || '无'}
-                </div>
-            </div>
-            `;
+                <div class="eq-title">${item.province_name} · ${item.magnitude}级</div>
+                <div class="eq-meta">时间：${item.earthquake_time} | ID：${item.earthquake_id}<br>
+                经纬度：${item.latitude},${item.longitude} | 深度：${item.depth}km<br>
+                描述：${item.earthquake_message || '-'}</div>
+            </div>`;
         });
-
-        container.innerHTML = html;
-        showToast(`加载成功，共 ${data.total} 条记录`);
-    })
-    .catch(err => {
-        container.innerHTML = `<div class="empty-tip">加载失败，请检查后端</div>`;
-        showToast("地震列表加载失败");
+        c.innerHTML = html;
     });
 }
 
-// ========== 普通用户 ==========
-// 用户注册
+// ========================== 用户 ==========================
 function userReg() {
-    let acc = document.getElementById("user_account").value.trim();
-    let pwd = document.getElementById("user_pwd").value.trim();
-
-    if(!acc || !pwd) return showToast("账号密码不能为空");
-    if(acc.length < 3 || acc.length > 20) return showToast("账号长度3-20位");
-    if(pwd.length < 6) return showToast("密码长度至少6位");
-
+    let acc = document.getElementById("user_account").value;
+    let pwd = document.getElementById("user_pwd").value;
     fetch("http://127.0.0.1:5000/api/user/register", {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({user_account:acc,password:pwd})
-    })
-    .then(res=>res.json())
-    .then(data=>{
-        if(data.code===200) {
-            showToast("用户注册成功，请登录");
-            document.getElementById("user_pwd").value = "";
-        } else {
-            showToast(data.msg);
-        }
-    })
-    .catch(err => showToast("请求失败，请检查后端服务"));
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_account: acc, password: pwd })
+    }).then(res => res.json()).then(d => showToast(d.msg));
 }
 
-// 用户登录
 function userLogin() {
-    let acc = document.getElementById("user_account").value.trim();
-    let pwd = document.getElementById("user_pwd").value.trim();
-    if(!acc || !pwd) return showToast("账号密码不能为空");
-
+    let acc = document.getElementById("user_account").value;
+    let pwd = document.getElementById("user_pwd").value;
     fetch("http://127.0.0.1:5000/api/user/login", {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({user_account:acc,password:pwd})
-    })
-    .then(res=>res.json())
-    .then(data=>{
-        console.log("用户登录响应:", data);
-        if(data.code===200) {
-            currentUserToken = data.data.user_token;
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_account: acc, password: pwd }),
+        credentials: "include"
+    }).then(res => res.json()).then(d => {
+        if (d.code === 200) {
+            currentUserToken = d.data.user_token;
             localStorage.setItem("user_token", currentUserToken);
-            localStorage.setItem("user_account", data.data.user_account);
-            updateUserStatus(data.data.user_account);
-            showToast("用户登录成功");
-        } else {
-            showToast(data.msg);
+            localStorage.setItem("user_account", d.data.user_account);
+            updateUserStatus(d.data.user_account);
         }
-    })
-    .catch(err => {
-        console.error("用户登录错误:", err);
-        showToast("请求失败，请检查后端服务");
+        showToast(d.msg);
     });
 }
 
-// 用户登出
 function userLogout() {
-    if(!currentUserToken && !localStorage.getItem("user_token")) {
-        return showToast("未登录");
-    }
-
     fetch("http://127.0.0.1:5000/api/user/logout", {
-        method:"POST",
-        headers:{"Content-Type":"application/json"}
-    })
-    .then(res=>res.json())
-    .then(data=>{
+        method: "POST", credentials: "include"
+    }).then(() => {
         currentUserToken = null;
-        localStorage.removeItem("user_token");
-        localStorage.removeItem("user_account");
+        localStorage.clear();
         updateUserStatus(null);
-        showToast("已退出登录");
-    })
-    .catch(err => showToast("请求失败"));
-}
-
-// ========== 管理员 ==========
-// 管理员注册
-function adminReg() {
-    let acc = document.getElementById("admin_account").value.trim();
-    let pwd = document.getElementById("admin_pwd").value.trim();
-    let key = document.getElementById("admin_key").value.trim();
-
-    if(!acc || !pwd || !key) return showToast("账号、密码、密钥不能为空");
-    if(pwd.length < 6) return showToast("密码长度至少6位");
-
-    fetch("http://127.0.0.1:5000/api/admin/register", {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({
-            admin_account:acc,
-            password:pwd,
-            admin_key:key
-        })
-    })
-    .then(res=>res.json())
-    .then(data=>{
-        if(data.code===200) {
-            showToast("管理员注册成功，请登录");
-            document.getElementById("admin_pwd").value = "";
-        } else {
-            showToast(data.msg);
-        }
-    })
-    .catch(err => showToast("请求失败，请检查后端服务"));
-}
-
-// 管理员登录
-function adminLogin() {
-    let acc = document.getElementById("admin_account").value.trim();
-    let pwd = document.getElementById("admin_pwd").value.trim();
-    if(!acc || !pwd) return showToast("账号密码不能为空");
-
-    console.log("尝试登录管理员:", acc);
-
-    fetch("http://127.0.0.1:5000/api/admin/login", {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({
-            admin_account:acc,
-            password:pwd
-        })
-    })
-    .then(res=>{
-        console.log("响应状态:", res.status);
-        return res.json();
-    })
-    .then(data=>{
-        console.log("管理员登录响应:", data);
-        if(data.code===200) {
-            currentAdminToken = data.data.admin_token;
-            localStorage.setItem("admin_token", currentAdminToken);
-            localStorage.setItem("admin_account", data.data.admin_account);
-            updateAdminStatus(data.data.admin_account);
-            showToast("管理员登录成功");
-        } else {
-            showToast(data.msg);
-        }
-    })
-    .catch(err => {
-        console.error("管理员登录错误:", err);
-        showToast("请求失败，请检查后端服务");
+        showToast("已登出");
     });
 }
 
-// 管理员登出
+// ========================== 管理员 ==========================
+function adminReg() {
+    let acc = document.getElementById("admin_account").value;
+    let pwd = document.getElementById("admin_pwd").value;
+    let key = document.getElementById("admin_key").value;
+    fetch("http://127.0.0.1:5000/api/admin/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ admin_account: acc, password: pwd, admin_key: key })
+    }).then(res => res.json()).then(d => showToast(d.msg));
+}
+
+function adminLogin() {
+    let acc = document.getElementById("admin_account").value;
+    let pwd = document.getElementById("admin_pwd").value;
+    fetch("http://127.0.0.1:5000/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ admin_account: acc, password: pwd }),
+        credentials: "include"
+    }).then(res => res.json()).then(d => {
+        if (d.code === 200) {
+            currentAdminToken = d.data.admin_token;
+            localStorage.setItem("admin_token", currentAdminToken);
+            localStorage.setItem("admin_account", d.data.admin_account);
+            updateAdminStatus(d.data.admin_account);
+        }
+        showToast(d.msg);
+    });
+}
+
 function adminLogout() {
-    if(!currentAdminToken && !localStorage.getItem("admin_token")) {
-        return showToast("未登录");
-    }
-
     fetch("http://127.0.0.1:5000/api/admin/logout", {
-        method:"POST",
-        headers:{"Content-Type":"application/json"}
-    })
-    .then(res=>res.json())
-    .then(data=>{
+        method: "POST", credentials: "include"
+    }).then(() => {
         currentAdminToken = null;
-        localStorage.removeItem("admin_token");
-        localStorage.removeItem("admin_account");
+        localStorage.clear();
         updateAdminStatus(null);
-        showToast("已退出登录");
-    })
-    .catch(err => showToast("请求失败"));
+        showToast("已登出");
+    });
 }
 
-// ========== 添加地震 ==========
-async function addEarthquake() {
-    if(!currentAdminToken && !localStorage.getItem("admin_token")) {
-        return showToast("请先以管理员身份登录");
-    }
-
-    let token = currentAdminToken || localStorage.getItem("admin_token");
-
-    let province_id = parseInt(document.getElementById("province_id").value);
-    let earthquake_time = document.getElementById("earthquake_time").value.trim();
-    let latitude = parseFloat(document.getElementById("latitude").value);
-    let longitude = parseFloat(document.getElementById("longitude").value);
-    let depth = parseFloat(document.getElementById("depth").value);
-    let magnitude = parseFloat(document.getElementById("magnitude").value);
-    let msg = document.getElementById("earthquake_message").value.trim();
-
-    if(!province_id||!earthquake_time||!latitude||!longitude||!depth||!magnitude){
-        return showToast("请填写完整地震信息");
-    }
-
-    try {
-        let res = await fetch("http://127.0.0.1:5000/api/earthquake/list");
-        let listData = await res.json();
-        let list = listData.data || [];
-
-        let dup = list.some(item=>
-            item.province_id === province_id &&
-            item.earthquake_time === earthquake_time &&
-            parseFloat(item.magnitude) === magnitude
-        );
-        if(dup) return showToast("该地震数据已存在，请勿重复上传");
-    } catch(err) {
-        return showToast("获取地震列表失败");
-    }
-
+// ========================== 地震管理 ==========================
+function addEarthquake() {
+    let p = document.getElementById("province_id").value;
+    let t = document.getElementById("earthquake_time").value;
+    let lat = document.getElementById("latitude").value;
+    let lng = document.getElementById("longitude").value;
+    let dep = document.getElementById("depth").value;
+    let mag = document.getElementById("magnitude").value;
+    let msg = document.getElementById("earthquake_message").value;
     fetch("http://127.0.0.1:5000/api/admin/earthquake/add", {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({
-            province_id,
-            earthquake_time,
-            latitude,
-            longitude,
-            depth,
-            magnitude,
-            earthquake_message:msg,
-            admin_token: token
-        })
-    })
-    .then(res=>res.json())
-    .then(data=>{
-        if(data.code===200) {
-            showToast("地震数据上传成功");
-            // 自动刷新列表
-            loadEarthquakeList();
-            document.getElementById("province_id").value = "";
-            document.getElementById("earthquake_time").value = "";
-            document.getElementById("latitude").value = "";
-            document.getElementById("longitude").value = "";
-            document.getElementById("depth").value = "";
-            document.getElementById("magnitude").value = "";
-            document.getElementById("earthquake_message").value = "";
-        } else {
-            showToast(data.msg);
-        }
-    })
-    .catch(err => showToast("请求失败，请检查服务是否启动"));
-}
-
-// ========== 修改地震 ==========
-function updateEarthquake(){
-    if(!currentAdminToken && !localStorage.getItem("admin_token")) {
-        return showToast("请先以管理员身份登录");
-    }
-
-    let token = currentAdminToken || localStorage.getItem("admin_token");
-
-    let id = document.getElementById("eq_id").value;
-    if(!id) return showToast("请输入要修改的地震ID");
-
-    let obj = {
-        earthquake_id: id,
-        province_id: document.getElementById("update_province").value || undefined,
-        earthquake_time: document.getElementById("update_time").value || undefined,
-        latitude: document.getElementById("update_lat").value || undefined,
-        longitude: document.getElementById("update_lng").value || undefined,
-        depth: document.getElementById("update_depth").value || undefined,
-        magnitude: document.getElementById("update_mag").value || undefined,
-        earthquake_message: document.getElementById("update_msg").value || undefined,
-        admin_token: token
-    };
-    fetch("http://127.0.0.1:5000/api/admin/earthquake/update",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify(obj)
-    })
-    .then(r=>r.json())
-    .then(d=>{
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            province_id: p, earthquake_time: t, latitude: lat, longitude: lng,
+            depth: dep, magnitude: mag, earthquake_message: msg
+        }),
+        credentials: "include"
+    }).then(res => res.json()).then(d => {
         showToast(d.msg);
-        if(d.code === 200) {
-            loadEarthquakeList();
-            document.getElementById("eq_id").value = "";
-        }
-    })
-    .catch(()=>showToast("请求失败"));
+        loadEarthquakeList();
+    });
 }
 
-// ========== 删除地震 ==========
-function deleteEarthquake(){
-    if(!currentAdminToken && !localStorage.getItem("admin_token")) {
-        return showToast("请先以管理员身份登录");
-    }
-
-    let token = currentAdminToken || localStorage.getItem("admin_token");
-
+function updateEarthquake() {
     let id = document.getElementById("eq_id").value;
-    if(!id) return showToast("请输入地震ID");
-
-    if(!confirm("确定要删除这条地震记录吗？")) return;
-
-    fetch("http://127.0.0.1:5000/api/admin/earthquake/delete",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({earthquake_id:id, admin_token:token})
-    })
-    .then(r=>r.json())
-    .then(d=>{
-        showToast(d.msg);
-        if(d.code === 200) {
-            loadEarthquakeList();
-            document.getElementById("eq_id").value = "";
-        }
-    })
-    .catch(()=>showToast("请求失败"));
+    fetch("http://127.0.0.1:5000/api/admin/earthquake/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            earthquake_id: id,
+            province_id: document.getElementById("update_province").value,
+            earthquake_time: document.getElementById("update_time").value,
+            latitude: document.getElementById("update_lat").value,
+            longitude: document.getElementById("update_lng").value,
+            depth: document.getElementById("update_depth").value,
+            magnitude: document.getElementById("update_mag").value,
+            earthquake_message: document.getElementById("update_msg").value
+        }),
+        credentials: "include"
+    }).then(res => res.json()).then(d => showToast(d.msg));
 }
-</script>
-<div class="container">
-    <h2>测试：订阅省份 & 查看预警</h2>
-    <!-- 👇 这里 ID 改名了 -->
-    <input type="number" id="sub_province_id" placeholder="输入省份ID（如：21 四川省）" style="width:180px;">
-    <button onclick="subscribe()">订阅该省份</button>
-    <button onclick="showMySubscriptions()">我的订阅</button>
-    <button onclick="showAlerts()">我的预警</button>
-    <div id="result" style="margin-top:10px; font-size:14px; white-space:pre-wrap;"></div>
-</div>
 
-<script>
+function deleteEarthquake() {
+    let id = document.getElementById("eq_id").value;
+    fetch("http://127.0.0.1:5000/api/admin/earthquake/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ earthquake_id: id }),
+        credentials: "include"
+    }).then(res => res.json()).then(d => showToast(d.msg));
+}
+
+// ========================== 订阅 & 预警 ==========================
 function subscribe() {
-    // 👇 这里也对应改了
-    let pid = document.getElementById("sub_province_id").value.trim();
-
-    if (!pid) {
-        showToast("请输入省份ID");
-        return;
-    }
-
+    let pid = document.getElementById("sub_province_id").value;
     fetch("http://127.0.0.1:5000/api/user/subscribe", {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ province_id: pid }),
         credentials: "include"
-    })
-    .then(res => res.json())
-    .then(data => {
-        showToast(data.msg);
-        document.getElementById("result").innerText = data.msg;
-    })
-    .catch(err => {
-        showToast("订阅请求失败");
-    });
+    }).then(res => res.json()).then(d => showToast(d.msg));
 }
 
 function showMySubscriptions() {
-    fetch("http://127.0.0.1:5000/api/user/subscriptions", {
-        credentials: "include"
-    }).then(res=>res.json()).then(data=>{
+    fetch("http://127.0.0.1:5000/api/user/subscriptions", { credentials: "include" })
+    .then(res => res.json()).then(d => {
         let txt = "我的订阅：\n";
-        if(data.data){
-            data.data.forEach(item=>{
-                txt += item.province_name + "\n";
-            });
-        }
+        d.data.forEach(i => txt += i.province_name + "\n");
         document.getElementById("result").innerText = txt;
     });
 }
 
 function showAlerts() {
-    fetch("http://127.0.0.1:5000/api/user/alerts", {
-        credentials: "include"
-    }).then(res=>res.json()).then(data=>{
+    fetch("http://127.0.0.1:5000/api/user/alerts", { credentials: "include" })
+    .then(res => res.json()).then(d => {
         let txt = "我的预警：\n";
-        if(data.data){
-            data.data.forEach(item=>{
-                txt += item.province_name + " " + item.magnitude + "级\n";
-            });
-        }
+        d.data.forEach(i => txt += i.province_name + " " + i.magnitude + "级\n");
         document.getElementById("result").innerText = txt;
+    });
+}
+
+// ========================== 聊天室 ==========================
+function sendChat() {
+    let content = document.getElementById("chat_msg").value.trim();
+    if (!content) return;
+    fetch("http://127.0.0.1:5000/api/user/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+        credentials: "include"
+    }).then(() => {
+        document.getElementById("chat_msg").value = "";
+        loadChat();
+    });
+}
+
+function loadChat() {
+    fetch("http://127.0.0.1:5000/api/user/chat/list", { credentials: "include" })
+    .then(res => res.json())
+    .then(d => {
+        let box = document.getElementById("chat_box");
+        box.innerHTML = "";
+        d.data.forEach(item => {
+            let div = document.createElement("div");
+            div.innerText = `[${item.create_time}] ${item.username}：${item.content}`;
+            box.appendChild(div);
+        });
+        box.scrollTop = box.scrollHeight;
+    });
+}
+
+// ========================== 反馈 ==========================
+function submitFeedback() {
+    let type = document.getElementById("fb_type").value;
+    let prio = document.getElementById("fb_priority").value;
+    let content = document.getElementById("fb_content").value;
+    fetch("http://127.0.0.1:5000/api/user/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ feedback_type: type, priority: prio, content: content }),
+        credentials: "include"
+    }).then(res => res.json()).then(d => {
+        showToast(d.msg);
+        if (d.code === 200) document.getElementById("fb_content").value = "";
     });
 }
 </script>
