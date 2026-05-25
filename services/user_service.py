@@ -1,9 +1,12 @@
 from flask import request, jsonify, session
 from flask_login import login_user, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-import secrets
-from models import db, User, UserSubscribeProvince, UserEarthquakeAlert, Province, EarthquakeInfo,UserFeedback,ChatMessage
+import secrets, datetime
+from models import db, User, UserSubscribeProvince, UserEarthquakeAlert, Province, EarthquakeInfo, UserFeedback, \
+    ChatMessage
 
+
+# ====================== 登录注册 ======================
 def svc_user_register():
     data = request.get_json(force=True)
     account = data.get('user_account')
@@ -22,6 +25,7 @@ def svc_user_register():
     db.session.commit()
     return jsonify({"code": 200, "msg": "注册成功"})
 
+
 def svc_user_login():
     data = request.get_json(force=True)
     account = data.get('user_account')
@@ -31,26 +35,35 @@ def svc_user_login():
     u = User.query.filter_by(user_account=account).first()
     if not u or not check_password_hash(u.password, pwd):
         return jsonify({"code": 401, "msg": "账号或密码错误"}), 401
+
+    # 登录时更新最后活跃时间
+    u.last_active_time = datetime.datetime.now()
+    db.session.commit()
+
     login_user(u)
     session['user_id'] = u.user_id
     session['user_account'] = u.user_account
     token = secrets.token_hex(32)
     session['user_token'] = token
-    return jsonify({"code": 200, "msg": "登录成功", "data": {"user_id": u.user_id, "user_account": u.user_account, "user_token": token}})
+    return jsonify({"code": 200, "msg": "登录成功",
+                    "data": {"user_id": u.user_id, "user_account": u.user_account, "user_token": token}})
+
 
 def svc_user_logout():
     logout_user()
     session.clear()
     return jsonify({"code": 200, "msg": "退出成功"})
 
+
 def svc_user_info():
     return jsonify({"code": 200, "data": {"user_id": current_user.user_id, "user_account": current_user.user_account}})
 
+
+# ====================== 单省份订阅（保留兼容） ======================
 def svc_subscribe_province():
     data = request.get_json(force=True)
     province_id = data.get('province_id')
 
-    # 这里加一个判断：如果是空字符串，也视为有值
     if province_id == "":
         province_id = None
 
@@ -75,6 +88,7 @@ def svc_subscribe_province():
     db.session.commit()
     return jsonify({"code": 200, "msg": "订阅成功"})
 
+
 def svc_unsubscribe_province(subscribe_id):
     sub = UserSubscribeProvince.query.get(subscribe_id)
     if not sub or sub.user_id != current_user.user_id:
@@ -82,6 +96,7 @@ def svc_unsubscribe_province(subscribe_id):
     db.session.delete(sub)
     db.session.commit()
     return jsonify({"code": 200, "msg": "取消订阅成功"})
+
 
 def svc_get_subscriptions():
     subs = UserSubscribeProvince.query.filter_by(user_id=current_user.user_id).all()
@@ -91,8 +106,35 @@ def svc_get_subscriptions():
         res.append({"id": s.id, "province_id": s.province_id, "province_name": p.province_name if p else "未知"})
     return jsonify({"code": 200, "data": res})
 
+
+# ====================== 【新增】批量订阅（支持多选大区） ======================
+def svc_user_batch_subscribe():
+    user_id = current_user.user_id
+    province_ids = request.get_json().get("province_ids", [])
+
+    # 清空原有订阅
+    UserSubscribeProvince.query.filter_by(user_id=user_id).delete()
+
+    # 批量添加
+    for pid in province_ids:
+        if Province.query.get(pid):
+            db.session.add(UserSubscribeProvince(user_id=user_id, province_id=pid))
+
+    db.session.commit()
+    return jsonify({"code": 200, "msg": "订阅已更新"})
+
+
+# ====================== 【新增】获取我的订阅ID列表（用于前端回显勾选） ======================
+def svc_user_my_subscribe_ids():
+    subs = UserSubscribeProvince.query.filter_by(user_id=current_user.user_id).all()
+    pids = [s.province_id for s in subs]
+    return jsonify({"code": 200, "data": pids})
+
+
+# ====================== 预警 ======================
 def svc_get_user_alerts():
-    alerts = UserEarthquakeAlert.query.filter_by(user_id=current_user.user_id).order_by(UserEarthquakeAlert.id.desc()).all()
+    alerts = UserEarthquakeAlert.query.filter_by(user_id=current_user.user_id).order_by(
+        UserEarthquakeAlert.id.desc()).all()
     res = []
     for a in alerts:
         eq = EarthquakeInfo.query.get(a.earthquake_id)
@@ -108,9 +150,11 @@ def svc_get_user_alerts():
         })
     return jsonify({"code": 200, "data": res})
 
+
 def svc_get_unread_alerts_count():
     cnt = UserEarthquakeAlert.query.filter_by(user_id=current_user.user_id, is_read=False).count()
     return jsonify({"code": 200, "data": {"unread_count": cnt}})
+
 
 def svc_mark_alert_read(alert_id):
     a = UserEarthquakeAlert.query.get(alert_id)
@@ -120,12 +164,42 @@ def svc_mark_alert_read(alert_id):
     db.session.commit()
     return jsonify({"code": 200, "msg": "已标记已读"})
 
+
 def svc_mark_all_alerts_read():
     alerts = UserEarthquakeAlert.query.filter_by(user_id=current_user.user_id, is_read=False).all()
     for a in alerts:
         a.is_read = True
     db.session.commit()
     return jsonify({"code": 200, "msg": "全部已读"})
+
+
+# ====================== 【新增】预警设置（频率 + 通知方式） ======================
+def svc_user_get_alert_settings():
+    return jsonify({
+        "code": 200,
+        "data": {
+            "alert_frequency": current_user.alert_frequency,
+            "alert_methods": current_user.alert_methods
+        }
+    })
+
+
+def svc_user_update_alert_settings():
+    data = request.get_json()
+    u = current_user
+
+    freq = data.get("alert_frequency")
+    methods = data.get("alert_methods", [])
+
+    if freq in ["实时预警", "每日汇总"]:
+        u.alert_frequency = freq
+
+    valid = ["站内信", "短信通知", "邮件通知"]
+    u.alert_methods = [m for m in methods if m in valid]
+
+    db.session.commit()
+    return jsonify({"code": 200, "msg": "保存成功"})
+
 
 # ====================== 用户反馈 ======================
 def svc_submit_feedback(user_id, data):
@@ -147,6 +221,7 @@ def svc_submit_feedback(user_id, data):
 
     return jsonify({"code": 200, "msg": "反馈提交成功"})
 
+
 # ====================== 发送聊天消息 ======================
 def svc_send_chat_message(user_id, data):
     content = data.get("content", "").strip()
@@ -162,6 +237,7 @@ def svc_send_chat_message(user_id, data):
     db.session.commit()
 
     return jsonify({"code": 200, "msg": "发送成功"})
+
 
 # ====================== 获取聊天记录 ======================
 def svc_get_chat_list():
