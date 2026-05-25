@@ -20,7 +20,8 @@ CORS(app, supports_credentials=True, resources={
 
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = False
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///test.db'
+
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///instance/test.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)
