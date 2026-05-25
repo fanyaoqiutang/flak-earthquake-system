@@ -58,21 +58,45 @@ def read(alert_id):
 def read_all():
     return svc_mark_all_alerts_read()
 
+# ====================== ✅ 新增：批量订阅省份（多选大区） ======================
+@user_bp.route("/subscribe/batch", methods=["POST"])
+@login_required
+def subscribe_batch():
+    return svc_user_batch_subscribe()
+
+# ====================== ✅ 新增：获取我的订阅ID列表（用于前端回显勾选） ======================
+@user_bp.route("/subscribe/my", methods=["GET"])
+@login_required
+def my_subscribe_ids():
+    return svc_user_my_subscribe_ids()
+
+# ====================== ✅ 新增：预警设置（频率 + 通知方式） ======================
+@user_bp.route("/alert/settings", methods=["GET"])
+@login_required
+def get_alert_settings():
+    return svc_user_get_alert_settings()
+
+@user_bp.route("/alert/settings", methods=["POST"])
+@login_required
+def update_alert_settings():
+    return svc_user_update_alert_settings()
+
 # ====================== ✅ 用户反馈（必须登录） ======================
 @user_bp.route("/feedback", methods=["POST"])
-@login_required  # 必须登录
+@login_required
 def user_feedback():
     data = request.get_json()
     return svc_submit_feedback(current_user.user_id, data)
 
 # ====================== ✅ 公共聊天室：发送消息（必须登录） ======================
 @user_bp.route("/chat", methods=["POST"])
-@login_required  # 必须登录
+@login_required
 def send_chat():
     data = request.get_json()
     return svc_send_chat_message(current_user.user_id, data)
+
 # ====================== ✅ 公共聊天室：获取所有历史消息 ======================
 @user_bp.route("/chat/list", methods=["GET"])
-@login_required  # 必须登录才能看聊天记录
+@login_required
 def chat_list():
     return svc_get_chat_list()

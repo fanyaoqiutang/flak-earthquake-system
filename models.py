@@ -4,16 +4,13 @@ from flask_login import UserMixin
 
 db = SQLAlchemy()
 
-# 省份
+# 省份（新增：所属大区 region）
 class Province(db.Model):
     __tablename__ = 'province'
     province_id = db.Column(db.Integer, primary_key=True)
     province_name = db.Column(db.String(50), unique=True, nullable=False)
-    # db.relationship()函数能够自动找到关系中的外键
-    # backref 反向引用，自动在另一侧建立关系属性。lazy用于指定加载相关记录的方式，默认时lazy=true代表必要时要一次性加载全部记录
-    # joined和父查询一样加载记录，等同于lazy=false
-    # dynamic不直接加载记录，而是返回一个包含相关记录的query对象
-    # province.earthquakes取这个省的所有地震   能实现通过省份查该省份所有地震；backref能实现通过地震查所属省份
+    region = db.Column(db.String(20))  # 新增：地理大区（华北/东北等）
+
     earthquakes = db.relationship('EarthquakeInfo', backref='province', lazy=True)
 
 # 管理员
@@ -28,20 +25,28 @@ class Admin(UserMixin, db.Model):
     def get_id(self):
         return str(self.admin_id)
 
-# 用户
+# 用户（新增：手机号、状态、最后活跃、预警配置）
 class User(UserMixin, db.Model):
     __tablename__ = 'user'
     user_id = db.Column(db.Integer, primary_key=True)
     user_account = db.Column(db.String(50), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
     create_time = db.Column(db.DateTime, default=datetime.datetime.now)
-    # subscribes用来获取这个用户订阅的所有省份。通过关联表：用户订阅省份表。反向引用，能够通过订阅记录直接取它属于哪个用户
+
+    # 👇 新增字段，实现用户管理面板
+    phone = db.Column(db.String(11))                      # 手机号
+    status = db.Column(db.String(10), default="正常")     # 正常 / 禁用
+    last_active_time = db.Column(db.DateTime, default=datetime.datetime.now)  # 最后活跃
+
+    # 👇 新增预警设置字段
+    alert_frequency = db.Column(db.String(20), default="实时预警")    # 实时 / 每日汇总
+    alert_methods = db.Column(db.JSON, default=["站内信"])           # 通知方式
+
     subscribes = db.relationship('UserSubscribeProvince', backref='user', lazy=True)
     alerts = db.relationship('UserEarthquakeAlert', backref='user', lazy=True)
-    # 用户.feedback可以拿到这个用户的所有反馈。feedback.user可以拿到这条反馈是谁发的
     feedbacks = db.relationship('UserFeedback', backref='user', lazy=True)
     chats = db.relationship('ChatMessage', backref='user', lazy=True)
-    # flask-login登录验证，返回唯一识别的id  没有这个标识无法保持登录状态
+
     def get_id(self):
         return str(self.user_id)
 

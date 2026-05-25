@@ -1,7 +1,8 @@
 from flask import request, jsonify, session
 from werkzeug.security import generate_password_hash, check_password_hash
 import secrets, datetime
-from models import db, Admin, EarthquakeInfo, Province, AdminOperationLog, UserSubscribeProvince, UserEarthquakeAlert
+from models import db, Admin, EarthquakeInfo, Province,ChatMessage,UserFeedback,User, AdminOperationLog, UserSubscribeProvince, UserEarthquakeAlert
+from sqlalchemy import func,desc
 
 ADMIN_SECRET_KEY = "ADMIN_2025_EARTHQUAKE"
 
@@ -117,40 +118,60 @@ def svc_add_earthquake():
 def svc_update_earthquake():
     if not verify_admin():
         return jsonify({"code": 403, "msg": "无权限，请先以管理员身份登录"}), 403
-    data = request.get_json(force=True)
-    if not data.get('earthquake_id'):
+
+    data = request.get_json()
+    earthquake_id = data.get('earthquake_id')
+
+    if not earthquake_id:
         return jsonify({"code": 400, "msg": "地震ID不能为空"}), 400
-    eq = EarthquakeInfo.query.get(data.get('earthquake_id'))
+
+    eq = EarthquakeInfo.query.get(earthquake_id)
     if not eq:
-        return jsonify({"code": 400, "msg": "地震记录不存在"}), 400
+        return jsonify({"code": 404, "msg": "地震记录不存在"}), 404
+
     if data.get('province_id'):
         try:
-            pid = int(data['province_id'])
-            if not Province.query.get(pid):
-                return jsonify({"code": 400, "msg": "省份不存在"}), 400
-            eq.province_id = pid
+            pid = int(data.get('province_id'))
+            if Province.query.get(pid):
+                eq.province_id = pid
         except:
-            return jsonify({"code": 400, "msg": "省份ID格式错误"}), 400
-    if data.get('latitude'):
-        try: eq.latitude = float(data['latitude'])
-        except: return jsonify({"code": 400, "msg": "纬度格式错误"}), 400
-    if data.get('longitude'):
-        try: eq.longitude = float(data['longitude'])
-        except: return jsonify({"code": 400, "msg": "经度格式错误"}), 400
-    if data.get('depth'):
-        try: eq.depth = float(data['depth'])
-        except: return jsonify({"code": 400, "msg": "深度格式错误"}), 400
-    if data.get('magnitude'):
-        try: eq.magnitude = float(data['magnitude'])
-        except: return jsonify({"code": 400, "msg": "震级格式错误"}), 400
-    if data.get('earthquake_message'):
-        eq.earthquake_message = data['earthquake_message']
+            pass
+
     if data.get('earthquake_time'):
         try:
-            eq.earthquake_time = datetime.datetime.fromisoformat(data['earthquake_time'])
+            eq.earthquake_time = datetime.datetime.fromisoformat(data.get('earthquake_time'))
         except:
-            return jsonify({"code": 400, "msg": "时间格式错误"}), 400
+            pass
+
+    if data.get('latitude'):
+        try:
+            eq.latitude = float(data.get('latitude'))
+        except:
+            pass
+
+    if data.get('longitude'):
+        try:
+            eq.longitude = float(data.get('longitude'))
+        except:
+            pass
+
+    if data.get('depth'):
+        try:
+            eq.depth = float(data.get('depth'))
+        except:
+            pass
+
+    if data.get('magnitude'):
+        try:
+            eq.magnitude = float(data.get('magnitude'))
+        except:
+            pass
+
+    if data.get('earthquake_message') is not None:
+        eq.earthquake_message = data.get('earthquake_message')
+
     db.session.commit()
+
     add_admin_log(session.get('admin_id'), "修改地震", eq.earthquake_id)
     return jsonify({"code": 200, "msg": "修改成功"})
 
@@ -166,4 +187,182 @@ def svc_delete_earthquake():
     db.session.delete(eq)
     db.session.commit()
     add_admin_log(session.get('admin_id'), "删除地震", eq.earthquake_id)
+    return jsonify({"code": 200, "msg": "删除成功"})
+
+# ==========================
+# 【升级】用户管理（支持搜索、状态、最后活跃）
+# ==========================
+def svc_admin_get_all_users():
+    if not verify_admin():
+        return jsonify({"code": 403, "msg": "无管理员权限"}), 403
+
+    keyword = request.args.get("keyword")
+    status = request.args.get("status")
+
+    query = User.query
+
+    if status:
+        query = query.filter_by(status=status)
+    if keyword:
+        query = query.filter(
+            (User.user_account.like(f"%{keyword}%")) |
+            (User.phone.like(f"%{keyword}%"))
+        )
+
+    users = query.all()
+    data = []
+    now = datetime.datetime.now()
+
+    for u in users:
+        subs = UserSubscribeProvince.query.filter_by(user_id=u.user_id).all()
+        provinces = []
+        for s in subs:
+            p = Province.query.get(s.province_id)
+            if p:
+                provinces.append(p.province_name)
+
+        # 最后活跃时间格式化
+        if u.last_active_time:
+            delta = now - u.last_active_time
+            if delta.days >= 1:
+                last = f"{delta.days}天前"
+            elif delta.seconds >= 3600:
+                last = f"{delta.seconds//3600}小时前"
+            elif delta.seconds >= 60:
+                last = f"{delta.seconds//60}分钟前"
+            else:
+                last = "刚刚"
+        else:
+            last = "未知"
+
+        data.append({
+            "user_id": u.user_id,
+            "user_account": u.user_account,
+            "phone": u.phone or "未绑定",
+            "status": u.status,
+            "create_time": u.create_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "last_active": last,
+            "subscribed_provinces": provinces
+        })
+    return jsonify({"code": 200, "data": data})
+
+# ==========================
+# 【新增】用户统计（总用户/活跃/禁用）
+# ==========================
+def svc_admin_get_user_stats():
+    if not verify_admin():
+        return jsonify({"code":403,"msg":"无权限"}),403
+
+    now = datetime.datetime.now()
+    thirty_days_ago = now - datetime.timedelta(days=30)
+
+    total = User.query.count()
+    active = User.query.filter(User.last_active_time >= thirty_days_ago).count()
+    disabled = User.query.filter_by(status="禁用").count()
+
+    return jsonify({
+        "code":200,
+        "data":{
+            "total_users":total,
+            "active_users":active,
+            "disabled_users":disabled
+        }
+    })
+
+# ==========================
+# 【新增】切换用户状态（正常/禁用）
+# ==========================
+def svc_admin_toggle_user_status(user_id):
+    if not verify_admin():
+        return jsonify({"code":403,"msg":"无权限"}),403
+    u = User.query.get(user_id)
+    if not u:
+        return jsonify({"code":404,"msg":"用户不存在"}),404
+    u.status = "禁用" if u.status == "正常" else "正常"
+    db.session.commit()
+    return jsonify({"code":200,"msg":"状态已更新"})
+
+def svc_admin_delete_user(user_id):
+    if not verify_admin():
+        return jsonify({"code": 403, "msg": "无权限"}), 403
+
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"code": 404, "msg": "用户不存在"}), 404
+
+    UserSubscribeProvince.query.filter_by(user_id=user_id).delete()
+    UserFeedback.query.filter_by(user_id=user_id).delete()
+    ChatMessage.query.filter_by(user_id=user_id).delete()
+
+    db.session.delete(user)
+    db.session.commit()
+    return jsonify({"code": 200, "msg": "用户已删除"})
+
+# ==========================
+# 反馈管理
+# ==========================
+def svc_admin_get_all_feedbacks():
+    if not verify_admin():
+        return jsonify({"code": 403, "msg": "无权限"}), 403
+
+    fs = UserFeedback.query.order_by(desc(UserFeedback.submit_time)).all()
+    res = []
+    for f in fs:
+        u = User.query.get(f.user_id)
+        res.append({
+            "feedback_id": f.id,
+            "user_id": f.user_id,
+            "user_account": u.user_account if u else "已注销",
+            "feedback_type": f.feedback_type,
+            "content": f.content,
+            "priority": f.priority,
+            "status": f.status,
+            "submit_time": f.submit_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "handle_time": f.handle_time.strftime("%Y-%m-%d %H:%M:%S") if f.handle_time else None
+        })
+    return jsonify({"code": 200, "data": res})
+
+def svc_admin_handle_feedback(feedback_id):
+    if not verify_admin():
+        return jsonify({"code": 403, "msg": "无权限"}), 403
+
+    fb = UserFeedback.query.get(feedback_id)
+    if not fb:
+        return jsonify({"code": 404, "msg": "反馈不存在"}), 404
+
+    fb.status = "已处理"
+    fb.handle_time = datetime.datetime.now()
+    db.session.commit()
+    return jsonify({"code": 200, "msg": "已处理"})
+
+# ==========================
+# 聊天消息管理
+# ==========================
+def svc_admin_get_all_chat_messages():
+    if not verify_admin():
+        return jsonify({"code": 403, "msg": "无权限"}), 403
+
+    ms = ChatMessage.query.order_by(desc(ChatMessage.create_time)).all()
+    res = []
+    for m in ms:
+        u = User.query.get(m.user_id)
+        res.append({
+            "msg_id": m.id,
+            "user_id": m.user_id,
+            "user_account": u.user_account if u else "已注销",
+            "content": m.content,
+            "create_time": m.create_time.strftime("%Y-%m-%d %H:%M:%S")
+        })
+    return jsonify({"code": 200, "data": res})
+
+def svc_admin_delete_chat_msg(msg_id):
+    if not verify_admin():
+        return jsonify({"code": 403, "msg": "无权限"}), 403
+
+    msg = ChatMessage.query.get(msg_id)
+    if not msg:
+        return jsonify({"code": 404, "msg": "消息不存在"}), 404
+
+    db.session.delete(msg)
+    db.session.commit()
     return jsonify({"code": 200, "msg": "删除成功"})
