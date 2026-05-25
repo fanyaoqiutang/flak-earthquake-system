@@ -19,6 +19,9 @@ def admin_logout():
 def admin_info():
     return svc_admin_info()
 
+# ======================
+# 地震管理（仅管理员）
+# ======================
 @admin_bp.route("/earthquake/add", methods=["POST"])
 def add_eq():
     return svc_add_earthquake()
@@ -30,3 +33,46 @@ def update_eq():
 @admin_bp.route("/earthquake/delete", methods=["POST"])
 def delete_eq():
     return svc_delete_earthquake()
+
+# ======================
+# 用户管理
+# ======================
+@admin_bp.route("/user/list", methods=["GET"])
+def admin_user_list():
+    return svc_admin_get_all_users()
+
+# 👇 新增：用户统计（总用户、活跃、禁用）
+@admin_bp.route("/user/stats", methods=["GET"])
+def admin_user_stats():
+    return svc_admin_get_user_stats()
+
+# 👇 新增：切换用户状态（正常 / 禁用）
+@admin_bp.route("/user/status/<int:user_id>", methods=["POST"])
+def admin_user_status(user_id):
+    return svc_admin_toggle_user_status(user_id)
+
+@admin_bp.route("/user/delete/<int:user_id>", methods=["POST"])
+def admin_user_delete(user_id):
+    return svc_admin_delete_user(user_id)
+
+# ======================
+# 反馈管理
+# ======================
+@admin_bp.route("/feedback/list", methods=["GET"])
+def admin_feedback_list():
+    return svc_admin_get_all_feedbacks()
+
+@admin_bp.route("/feedback/handle/<int:fb_id>", methods=["POST"])
+def admin_feedback_handle(fb_id):
+    return svc_admin_handle_feedback(fb_id)
+
+# ======================
+# 聊天管理
+# ======================
+@admin_bp.route("/chat/list", methods=["GET"])
+def admin_chat_list():
+    return svc_admin_get_all_chat_messages()
+
+@admin_bp.route("/chat/delete/<int:msg_id>", methods=["POST"])
+def admin_chat_delete(msg_id):
+    return svc_admin_delete_chat_msg(msg_id)

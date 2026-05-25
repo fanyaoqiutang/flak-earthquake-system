@@ -51,38 +51,70 @@ with app.app_context():
     db.create_all()
     from models import Province
     if not Province.query.first():
+        # 👇 我只改了这里：给每个省份自动填上【所属大区 region】
         provinces = [
-            Province(province_name="北京市"), Province(province_name="天津市"),
-            Province(province_name="上海市"), Province(province_name="重庆市"),
-            Province(province_name="河北省"), Province(province_name="山西省"),
-            Province(province_name="辽宁省"), Province(province_name="吉林省"),
-            Province(province_name="黑龙江省"), Province(province_name="江苏省"),
-            Province(province_name="浙江省"), Province(province_name="安徽省"),
-            Province(province_name="福建省"), Province(province_name="江西省"),
-            Province(province_name="山东省"), Province(province_name="河南省"),
-            Province(province_name="湖北省"), Province(province_name="湖南省"),
-            Province(province_name="广东省"), Province(province_name="海南省"),
-            Province(province_name="四川省"), Province(province_name="贵州省"),
-            Province(province_name="云南省"), Province(province_name="陕西省"),
-            Province(province_name="甘肃省"), Province(province_name="青海省"),
-            Province(province_name="台湾省"), Province(province_name="内蒙古自治区"),
-            Province(province_name="广西壮族自治区"), Province(province_name="西藏自治区"),
-            Province(province_name="宁夏回族自治区"), Province(province_name="新疆维吾尔自治区"),
-            Province(province_name="香港特别行政区"), Province(province_name="澳门特别行政区")
+            # 华北
+            Province(province_name="北京市", region="华北地区"),
+            Province(province_name="天津市", region="华北地区"),
+            Province(province_name="河北省", region="华北地区"),
+            Province(province_name="山西省", region="华北地区"),
+            Province(province_name="内蒙古自治区", region="华北地区"),
+
+            # 东北
+            Province(province_name="辽宁省", region="东北地区"),
+            Province(province_name="吉林省", region="东北地区"),
+            Province(province_name="黑龙江省", region="东北地区"),
+
+            # 华东
+            Province(province_name="上海市", region="华东地区"),
+            Province(province_name="江苏省", region="华东地区"),
+            Province(province_name="浙江省", region="华东地区"),
+            Province(province_name="安徽省", region="华东地区"),
+            Province(province_name="福建省", region="华东地区"),
+            Province(province_name="江西省", region="华东地区"),
+            Province(province_name="山东省", region="华东地区"),
+
+            # 华中
+            Province(province_name="河南省", region="华中地区"),
+            Province(province_name="湖北省", region="华中地区"),
+            Province(province_name="湖南省", region="华中地区"),
+
+            # 华南
+            Province(province_name="广东省", region="华南地区"),
+            Province(province_name="广西壮族自治区", region="华南地区"),
+            Province(province_name="海南省", region="华南地区"),
+
+            # 西南
+            Province(province_name="重庆市", region="西南地区"),
+            Province(province_name="四川省", region="西南地区"),
+            Province(province_name="贵州省", region="西南地区"),
+            Province(province_name="云南省", region="西南地区"),
+            Province(province_name="西藏自治区", region="西南地区"),
+
+            # 西北
+            Province(province_name="陕西省", region="西北地区"),
+            Province(province_name="甘肃省", region="西北地区"),
+            Province(province_name="青海省", region="西北地区"),
+            Province(province_name="宁夏回族自治区", region="西北地区"),
+            Province(province_name="新疆维吾尔自治区", region="西北地区"),
+
+            # 港澳台
+            Province(province_name="台湾省", region="港澳台地区"),
+            Province(province_name="香港特别行政区", region="港澳台地区"),
+            Province(province_name="澳门特别行政区", region="港澳台地区"),
         ]
-        # 向数据库添加多条记录
         db.session.add_all(provinces)
-        # filter_by()以关键字形式根据指定规则过滤记录，返回新产生的查询对象，并返回符合条件的第一条记录
+
     if not Admin.query.filter_by(admin_account="admin").first():
         from werkzeug.security import generate_password_hash
         hashed_pwd = generate_password_hash("123456")
-        # 增加一条记录
         db.session.add(Admin(admin_account="admin", password=hashed_pwd, admin_key="ADMIN_2025_EARTHQUAKE"))
+
     if not User.query.filter_by(user_account="testuser").first():
         from werkzeug.security import generate_password_hash
         hashed_user_pwd = generate_password_hash("123456")
         db.session.add(User(user_account="testuser", password=hashed_user_pwd))
-    # 将会话提交至数据库
+
     db.session.commit()
 
 if __name__ == '__main__':
