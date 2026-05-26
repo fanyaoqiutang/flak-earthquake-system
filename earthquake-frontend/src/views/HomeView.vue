@@ -1,55 +1,70 @@
 <template>
-  <div class="earthquake-page">
-    <!-- 顶部筛选栏 -->
-    <div class="filter-bar bg-white p-4 shadow-sm mb-4 rounded-lg">
-      <div class="flex items-center flex-wrap gap-4">
-        <div class="filter-group">
-          <span class="mr-2 text-gray-600">按时间：</span>
-          <el-radio-group v-model="timeFilter" size="small">
-            <el-radio-button label="24h">最近24小时内</el-radio-button>
-            <el-radio-button label="48h">最近48小时内</el-radio-button>
-            <el-radio-button label="7d">最近7天内</el-radio-button>
-            <el-radio-button label="30d">最近30天内</el-radio-button>
-            <el-radio-button label="1y">最近一年内</el-radio-button>
-          </el-radio-group>
-        </div>
-        <div class="filter-group">
-          <span class="mr-2 text-gray-600">按震级：</span>
-          <el-radio-group v-model="magFilter" size="small">
-            <el-radio-button label="7">7.0级以上</el-radio-button>
-            <el-radio-button label="5">5.0级以上</el-radio-button>
-            <el-radio-button label="3">3.0级以上</el-radio-button>
-            <el-radio-button label="0">全部</el-radio-button>
-          </el-radio-group>
-        </div>
-        <el-button @click="resetFilter" size="small">重置</el-button>
+  <div class="home-container">
+    <!-- 统计卡片（缩小高度，更紧凑） -->
+    <div class="stats-row">
+      <div class="stat-item">
+        <div class="stat-num">{{ earthquakeData.length }}</div>
+        <div class="stat-text">今日地震次数</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num">{{ maxMagnitude }}</div>
+        <div class="stat-text">最大震级（级）</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num">{{ filteredEarthquakes.length }}</div>
+        <div class="stat-text">筛选结果</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num status-normal">正常</div>
+        <div class="stat-text">系统状态</div>
       </div>
     </div>
 
-    <!-- 地图 + 右侧列表布局 -->
-    <div class="map-container flex gap-4">
-      <!-- 地图主区域 -->
-      <div id="amap-container" class="map-box flex-1 rounded-lg overflow-hidden shadow-sm"></div>
-
-      <!-- 右侧地震列表 -->
-      <div class="list-box w-80 bg-white rounded-lg shadow-sm p-4 overflow-y-auto">
-        <div class="space-y-4">
-          <div v-for="quake in filteredEarthquakes" :key="quake.id" class="quake-item border-b pb-3">
-            <div class="flex items-center justify-between">
-              <span class="mag-tag bg-red-600 text-white px-2 py-1 rounded text-sm font-bold">
-                M{{ quake.magnitude }}
-              </span>
-              <el-button type="text" size="small" @click="showDetail(quake)">详情</el-button>
-            </div>
-            <p class="text-gray-800 font-medium mt-1">{{ quake.location }}</p>
-            <p class="text-gray-600 text-sm mt-1">震发时间：{{ quake.time }}</p>
-            <p class="text-gray-500 text-sm mt-1">
-              纬度{{ quake.lat }} 经度{{ quake.lng }} 深度{{ quake.depth }}KM
-            </p>
-          </div>
+    <!-- 筛选栏 -->
+    <div class="filter-bar">
+      <div class="filter-group">
+        <span class="filter-label">时间</span>
+        <div class="filter-btns">
+          <button @click="timeFilter = '24h'" :class="{ active: timeFilter === '24h' }">24小时</button>
+          <button @click="timeFilter = '7d'" :class="{ active: timeFilter === '7d' }">7天</button>
+          <button @click="timeFilter = '30d'" :class="{ active: timeFilter === '30d' }">30天</button>
+          <button @click="timeFilter = '1y'" :class="{ active: timeFilter === '1y' }">1年</button>
         </div>
-        <div class="text-center mt-4">
-          <el-button type="text" @click="loadMore">更多 »</el-button>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">震级</span>
+        <div class="filter-btns">
+          <button @click="magFilter = '0'" :class="{ active: magFilter === '0' }">全部</button>
+          <button @click="magFilter = '3'" :class="{ active: magFilter === '3' }">3.0+</button>
+          <button @click="magFilter = '5'" :class="{ active: magFilter === '5' }">5.0+</button>
+        </div>
+      </div>
+      <button class="reset-btn" @click="resetFilter">重置筛选</button>
+    </div>
+
+    <!-- 两栏布局（地图占绝对主体，侧边栏极简） -->
+    <div class="two-columns">
+      <!-- 左侧：超大地图 -->
+      <div class="left-col">
+        <div class="section-title">📍 地震分布地图</div>
+        <div id="mapContainer" class="map-box" ref="mapContainer"></div>
+      </div>
+
+      <!-- 右侧：只保留地震列表 -->
+      <div class="right-col">
+        <div class="quake-list-card">
+          <div class="card-title">近期地震信息</div>
+          <div class="simple-quake-list">
+            <div v-for="item in filteredEarthquakes.slice(0, 5)" :key="item.id" class="simple-quake-item">
+              <div class="simple-location">
+                <span class="loc-name">{{ item.location }}</span>
+                <span :class="['simple-mag', getMagClass(item.magnitude)]">M{{ item.magnitude }}</span>
+              </div>
+              <div class="simple-time">{{ item.time }}</div>
+              <div class="simple-info">深度：{{ item.depth }}km | 坐标：{{ item.lat }}°N, {{ item.lng }}°E</div>
+              <a href="#" class="detail-link">查看详情 ></a>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -57,194 +72,350 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
-import { ElRadioGroup, ElRadioButton, ElButton, ElMessage } from 'element-plus'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 
-// 你的高德地图 Key
-const AMAP_KEY = "a93d4f6da8bb5b797ff17210a9e21fdd"
-
-// 筛选条件
 const timeFilter = ref('1y')
 const magFilter = ref('0')
+const mapContainer = ref(null)
+
 let map = null
 let markers = []
 
-// 模拟地震数据（后续可替换为后端接口数据）
 const earthquakeData = ref([
-  {
-    id: '1',
-    location: '新疆乌鲁木齐市沙依巴克区',
-    magnitude: 3.9,
-    depth: 30,
-    time: '2026-05-18 16:32:28',
-    lat: 43.67,
-    lng: 87.42,
-    timestamp: new Date('2026-05-18 16:32:28').getTime()
-  },
-  {
-    id: '2',
-    location: '新疆阿克苏地区库车市',
-    magnitude: 4.1,
-    depth: 15,
-    time: '2026-05-18 13:09:20',
-    lat: 41.37,
-    lng: 83.92,
-    timestamp: new Date('2026-05-18 13:09:20').getTime()
-  },
-  {
-    id: '3',
-    location: '新疆阿克苏地区库车市',
-    magnitude: 4.5,
-    depth: 13,
-    time: '2026-05-18 13:07:27',
-    lat: 41.40,
-    lng: 83.96,
-    timestamp: new Date('2026-05-18 13:07:27').getTime()
-  },
-  {
-    id: '4',
-    location: '缅甸',
-    magnitude: 5.2,
-    depth: 10,
-    time: '2026-05-18 10:05:24',
-    lat: 16.55,
-    lng: 96.25,
-    timestamp: new Date('2026-05-18 10:05:24').getTime()
-  },
-  {
-    id: '5',
-    location: '广西柳州市柳南区',
-    magnitude: 3.3,
-    depth: 10,
-    time: '2026-05-18 07:41:44',
-    lat: 24.40,
-    lng: 109.27,
-    timestamp: new Date('2026-05-18 07:41:44').getTime()
-  }
+  { id: 1, location: '新疆乌鲁木齐市沙依巴克区', magnitude: 3.9, depth: 30, time: '2026-05-18 16:32:28', lat: 43.67, lng: 87.42 },
+  { id: 2, location: '新疆阿克苏地区库车市', magnitude: 4.1, depth: 15, time: '2026-05-18 13:09:20', lat: 41.37, lng: 83.92 },
+  { id: 3, location: '新疆阿克苏地区库车市', magnitude: 4.5, depth: 13, time: '2026-05-18 13:07:27', lat: 41.40, lng: 83.96 },
+  { id: 4, location: '缅甸', magnitude: 5.2, depth: 10, time: '2026-05-18 10:05:24', lat: 16.55, lng: 96.25 },
+  { id: 5, location: '广西柳州市柳南区', magnitude: 3.3, depth: 10, time: '2026-05-18 07:41:44', lat: 24.40, lng: 109.27 },
+  { id: 6, location: '四川甘孜州泸定县', magnitude: 4.8, depth: 18, time: '2026-05-17 22:15:33', lat: 29.85, lng: 102.12 },
+  { id: 7, location: '西藏日喀则市定日县', magnitude: 3.7, depth: 8, time: '2026-05-17 18:42:11', lat: 28.66, lng: 87.08 }
 ])
 
-// 筛选后的数据
-const filteredEarthquakes = ref([])
+const maxMagnitude = computed(() => {
+  return Math.max(...earthquakeData.value.map(e => e.magnitude)).toFixed(1)
+})
 
-// 初始化地图
-const initMap = () => {
-  const script = document.createElement('script')
-  script.src = `https://webapi.amap.com/maps?v=2.0&key=${AMAP_KEY}`
-  script.async = true
-  script.onload = () => {
-    map = new AMap.Map("amap-container", {
-      zoom: 4,
-      center: [104.195, 35.8617] // 中国中心坐标
-    })
-    updateMarkers()
-  }
-  document.head.appendChild(script)
-}
+const filteredEarthquakes = computed(() => {
+  const now = new Date()
+  let days = 365
+  if (timeFilter.value === '24h') days = 1
+  else if (timeFilter.value === '7d') days = 7
+  else if (timeFilter.value === '30d') days = 30
 
-// 更新地图标记
-const updateMarkers = () => {
-  if (!map) return
-  // 清除旧标记
-  markers.forEach(marker => map.remove(marker))
-  markers = []
+  const threshold = new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
 
-  // 添加新标记，根据震级设置样式
-  filteredEarthquakes.value.forEach(quake => {
-    const marker = new AMap.Marker({
-      position: [quake.lng, quake.lat],
-      title: `M${quake.magnitude} ${quake.location}`
-    })
-    marker.on('click', () => showDetail(quake))
-    map.add(marker)
-    markers.push(marker)
+  return earthquakeData.value.filter(item => {
+    const itemTime = new Date(item.time)
+    const timeMatch = itemTime >= threshold
+
+    let magMatch = true
+    if (magFilter.value === '3') magMatch = item.magnitude >= 3
+    else if (magFilter.value === '5') magMatch = item.magnitude >= 5
+
+    return timeMatch && magMatch
   })
+})
+
+const getMagClass = (mag) => {
+  if (mag >= 5) return 'high'
+  if (mag >= 3) return 'medium'
+  return 'low'
 }
 
-// 筛选逻辑
-const filterData = () => {
-  const now = Date.now()
-  let timeThreshold = now
-  switch (timeFilter.value) {
-    case '24h': timeThreshold = now - 24*3600*1000; break
-    case '48h': timeThreshold = now - 48*3600*1000; break
-    case '7d': timeThreshold = now - 7*24*3600*1000; break
-    case '30d': timeThreshold = now - 30*24*3600*1000; break
-    case '1y': timeThreshold = now - 365*24*3600*1000; break
-  }
-
-  filteredEarthquakes.value = earthquakeData.value.filter(quake => {
-    const timeOk = quake.timestamp >= timeThreshold
-    let magOk = false
-    switch (magFilter.value) {
-      case '7': magOk = quake.magnitude >= 7; break
-      case '5': magOk = quake.magnitude >= 5; break
-      case '3': magOk = quake.magnitude >= 3; break
-      case '0': magOk = true; break
-    }
-    return timeOk && magOk
-  })
-  if (map) updateMarkers()
-}
-
-// 重置筛选
 const resetFilter = () => {
   timeFilter.value = '1y'
   magFilter.value = '0'
 }
 
-// 显示详情
-const showDetail = (quake) => {
-  ElMessage.info(`查看 ${quake.location} 地震详情`)
+const initMap = () => {
+  const script = document.createElement('script')
+  script.src = `https://webapi.amap.com/maps?v=2.0&key=a93d4f6da8bb5b797ff17210a9e21fdd&plugin=AMap.Scale,AMap.ToolBar`
+  script.onload = () => {
+    createMap()
+  }
+  document.head.appendChild(script)
 }
 
-// 加载更多
-const loadMore = () => {
-  ElMessage.info('加载更多地震数据...')
+const createMap = () => {
+  if (!mapContainer.value || typeof AMap === 'undefined') return
+
+  map = new AMap.Map('mapContainer', {
+    zoom: 4,
+    center: [104.195, 35.8617],
+    resizeEnable: true,
+    viewMode: '2D',
+    backgroundColor: '#F5F7FA'
+  })
+
+  map.addControl(new AMap.Scale())
+  map.addControl(new AMap.ToolBar())
+  addMarkers()
 }
 
-// 监听筛选条件变化
-watch([timeFilter, magFilter], filterData)
+const addMarkers = () => {
+  if (!map || typeof AMap === 'undefined') return
 
-onMounted(() => {
-  filterData()
-  initMap()
+  markers.forEach(marker => map.remove(marker))
+  markers = []
+
+  filteredEarthquakes.value.forEach(item => {
+    const color = item.magnitude >= 5 ? '#EF4444' : item.magnitude >= 3 ? '#F59E0B' : '#10B981'
+    const size = 16 + item.magnitude * 2
+
+    const marker = new AMap.Marker({
+      position: [item.lng, item.lat],
+      content: `<div style="
+        width: ${size}px;
+        height: ${size}px;
+        background: ${color};
+        border-radius: 50%;
+        border: 2px solid white;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: ${size * 0.4}px;
+        font-weight: bold;
+        color: white;
+      ">${item.magnitude.toFixed(1)}</div>`,
+      offset: new AMap.Pixel(-size/2, -size/2)
+    })
+    markers.push(marker)
+    map.add(marker)
+  })
+
+  if (markers.length > 0) {
+    map.setFitView(markers, false, [50, 50, 50, 50])
+  }
+}
+
+watch(filteredEarthquakes, () => {
+  if (map) addMarkers()
 })
 
-onUnmounted(() => {
+onMounted(() => {
+  setTimeout(() => initMap(), 200)
+})
+
+onBeforeUnmount(() => {
   if (map) {
     map.destroy()
+    map = null
   }
 })
 </script>
 
 <style scoped>
-.earthquake-page {
-  min-height: 100vh;
-  background-color: #f5f7fa;
-  padding: 16px;
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
+
+.home-container {
+  min-height: 100vh;
+  background: #F5F7FB;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* 统计卡片（缩小高度） */
+.stats-row {
+  display: flex;
+  gap: 1px;
+  background: #E8ECF0;
+  margin: 20px 40px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.stat-item {
+  background: white;
+  flex: 1;
+  padding: 12px 16px;
+  text-align: center;
+}
+
+.stat-num {
+  font-size: 24px;
+  font-weight: 600;
+  color: #1E293B;
+  margin-bottom: 4px;
+}
+
+.stat-text {
+  font-size: 12px;
+  color: #8A99B0;
+}
+
+.status-normal {
+  color: #10B981;
+}
+
+/* 筛选栏 */
 .filter-bar {
+  background: white;
+  border: 1px solid #E8ECF0;
+  border-radius: 8px;
+  padding: 12px 20px;
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  gap: 32px;
+  margin: 0 40px 20px;
 }
-.map-container {
-  height: calc(100vh - 150px);
+
+.filter-group {
   display: flex;
+  align-items: center;
   gap: 16px;
 }
-.map-box {
-  height: 100%;
+
+.filter-label {
+  font-size: 13px;
+  color: #475569;
+  font-weight: 500;
+}
+
+.filter-btns {
+  display: flex;
+  gap: 12px;
+}
+
+.filter-btns button {
+  background: none;
+  border: none;
+  font-size: 13px;
+  color: #64748B;
+  cursor: pointer;
+  padding: 4px 0;
+  border-bottom: 2px solid transparent;
+}
+
+.filter-btns button.active {
+  color: #1677ff;
+  border-bottom-color: #1677ff;
+}
+
+.reset-btn {
+  margin-left: auto;
+  background: none;
+  border: none;
+  font-size: 13px;
+  color: #64748B;
+  cursor: pointer;
+}
+
+/* 两栏布局（地图占比更大，侧边栏更窄） */
+.two-columns {
+  display: flex;
+  gap: 20px;
+  padding: 0 40px 40px;
+}
+
+.left-col {
+  flex: 4;
+}
+
+.right-col {
   flex: 1;
-  border-radius: 10px;
+}
+
+/* 地图（高度放大，几乎占满页面） */
+.section-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1E293B;
+  margin-bottom: 10px;
+}
+
+.map-box {
+  height: 600px;
+  background: #F0F4FA;
+  border-radius: 8px;
   overflow: hidden;
-  background: #eef2f7;
+  border: 1px solid #E8ECF0;
 }
-.list-box {
-  height: 100%;
-  width: 320px;
+
+/* 地震列表 */
+.quake-list-card {
+  background: white;
+  border: 1px solid #E8ECF0;
+  border-radius: 8px;
+  padding: 16px;
 }
-.mag-tag {
-  font-weight: bold;
+
+.card-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1E293B;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #F0F2F5;
+}
+
+.simple-quake-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.simple-quake-item {
+  border-bottom: 1px solid #F5F7FB;
+  padding-bottom: 12px;
+}
+
+.simple-quake-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.simple-location {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.loc-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1E293B;
+}
+
+.simple-mag {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.simple-mag.high { color: #DC2626; }
+.simple-mag.medium { color: #F59E0B; }
+.simple-mag.low { color: #10B981; }
+
+.simple-time {
+  font-size: 11px;
+  color: #8A99B0;
+  margin-bottom: 4px;
+}
+
+.simple-info {
+  font-size: 11px;
+  color: #94A3B8;
+  margin-bottom: 6px;
+}
+
+.detail-link {
+  font-size: 12px;
+  color: #1677ff;
+  text-decoration: none;
+}
+
+/* 响应式 */
+@media (max-width: 1200px) {
+  .two-columns {
+    flex-direction: column;
+  }
+  .map-box {
+    height: 450px;
+  }
 }
 </style>
