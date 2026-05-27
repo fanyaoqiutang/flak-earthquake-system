@@ -1,5 +1,6 @@
 from flask import Flask,render_template
 from flask_login import LoginManager
+from flask_cors import CORS
 from models import db, User, Admin
 # 导入蓝图
 from routes.admin_routes import admin_bp
@@ -7,6 +8,7 @@ from routes.user_routes import user_bp
 from routes.common_routes import common_bp
 
 app = Flask(__name__)
+CORS(app, supports_credentials=True)
 app.secret_key = "earthquake_2025_secure_key_change_in_production"
 app.config['SESSION_COOKIE_SAMESITE'] = None
 app.config['SESSION_COOKIE_SECURE'] = False
@@ -37,14 +39,6 @@ def login():
 app.register_blueprint(admin_bp)
 app.register_blueprint(user_bp)
 app.register_blueprint(common_bp)
-
-# 跨域
-@app.after_request
-def after_request(resp):
-    resp.headers["Access-Control-Allow-Origin"] = "*"
-    resp.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS,DELETE"
-    resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
-    return resp
 
 # 初始化数据
 with app.app_context():

@@ -17,6 +17,10 @@
             <el-icon><HomeFilled /></el-icon>
             <span>首页</span>
           </el-menu-item>
+          <el-menu-item index="/statistics">
+            <el-icon><DataAnalysis /></el-icon>
+            <span>数据统计</span>
+          </el-menu-item>
           <el-menu-item index="/science">
             <el-icon><Reading /></el-icon>
             <span>科普知识</span>
@@ -47,10 +51,16 @@
               </span>
               <template #dropdown>
                 <el-dropdown-menu>
-                  <el-dropdown-item command="profile">个人中心</el-dropdown-item>
-                  <el-dropdown-item v-if="userRole === 'admin'" command="admin">管理后台</el-dropdown-item>
-                  <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
+                  <el-dropdown-item @click="handleProfile">
+                    <el-icon><User /></el-icon>
+                    个人中心
+                  </el-dropdown-item>
+                  <el-dropdown-item divided @click="handleLogout">
+                    <el-icon><SwitchButton /></el-icon>
+                    退出登录
+                  </el-dropdown-item>
                 </el-dropdown-menu>
+
               </template>
             </el-dropdown>
           </template>
@@ -68,11 +78,11 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  HomeFilled, Reading, ChatDotRound, Location, Bell, User, ArrowDown
+  HomeFilled, DataAnalysis, Reading, ChatDotRound, Location, Bell, User, ArrowDown, SwitchButton
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -94,6 +104,11 @@ onMounted(() => {
   loadUserInfo()
 })
 
+// 监听路由变化，重新加载用户信息
+watch(() => route.path, () => {
+  loadUserInfo()
+})
+
 const loadUserInfo = () => {
   const userAccount = localStorage.getItem('user_account')
   const adminAccount = localStorage.getItem('admin_account')
@@ -108,6 +123,25 @@ const loadUserInfo = () => {
 }
 
 const goToLogin = () => {
+  router.push('/login')
+}
+
+const handleProfile = () => {
+  const adminToken = localStorage.getItem('admin_token')
+  console.log('点击个人中心，adminToken:', adminToken)
+
+  if (adminToken) {
+    console.log('跳转到管理员页面')
+    router.push('/admin/profile')
+  } else {
+    console.log('跳转到普通用户页面')
+    router.push('/profile')
+  }
+}
+
+const handleLogout = () => {
+  localStorage.clear()
+  ElMessage.success('退出登录成功')
   router.push('/login')
 }
 

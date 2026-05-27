@@ -1,4 +1,4 @@
-from flask import Blueprint
+from flask import Blueprint, request
 from services.common_service import *
 from services.common_service import svc_get_provinces_group_by_region
 common_bp = Blueprint("common", __name__, url_prefix="/api")
@@ -41,3 +41,10 @@ def earthquake_rank():
 @common_bp.route("/province/group", methods=["GET"])
 def get_provinces_group_by_region():
     return svc_get_provinces_group_by_region()
+
+# ======================
+# 数据统计接口
+# ======================
+@common_bp.route("/statistics", methods=["GET"])
+def earthquake_statistics():
+    return svc_earthquake_statistics()
