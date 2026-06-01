@@ -1,4 +1,3 @@
-NEW_FILE_CODE
 <template>
   <div class="profile-container">
     <el-row :gutter="20">
@@ -189,9 +188,19 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { User, Lock, Bell, ChatDotRound, Document } from '@element-plus/icons-vue'
+import {
+  getUserInfo,
+  getSubscriptions,
+  unsubscribeProvince,
+  getAlerts,
+  markAlertRead,
+  markAllAlertsRead,
+  getChatList,
+  getAlertSettings,
+  updateAlertSettings
+} from '../API/user'
 
 const router = useRouter()
-const API_BASE = 'http://127.0.0.1:5000'
 
 const activeMenu = ref('basic')
 const menuTitle = computed(() => {
@@ -233,6 +242,7 @@ onMounted(() => {
   loadSubscriptions()
   loadMessages()
   loadChatHistory()
+  loadAlertSettings()
 })
 
 const handleMenuSelect = (index) => {
@@ -241,15 +251,11 @@ const handleMenuSelect = (index) => {
 
 const loadUserInfo = async () => {
   try {
-    const token = localStorage.getItem('user_token')
-    const response = await fetch(`${API_BASE}/api/user/info`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    })
-    const data = await response.json()
-    if (data.code === 200) {
-      basicForm.nickname = data.data.user_account
+    const response = await getUserInfo()
+    if (response.code === 200) {
+      basicForm.nickname = response.data.user_account
+      basicForm.phone = response.data.phone || ''
+      basicForm.email = response.data.email || ''
     }
   } catch (error) {
     console.error('加载用户信息失败:', error)
@@ -258,15 +264,9 @@ const loadUserInfo = async () => {
 
 const loadSubscriptions = async () => {
   try {
-    const token = localStorage.getItem('user_token')
-    const response = await fetch(`${API_BASE}/api/user/subscriptions`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    })
-    const data = await response.json()
-    if (data.code === 200) {
-      subscriptions.value = data.data
+    const response = await getSubscriptions()
+    if (response.code === 200) {
+      subscriptions.value = response.data
     }
   } catch (error) {
     console.error('加载订阅失败:', error)
@@ -275,15 +275,9 @@ const loadSubscriptions = async () => {
 
 const loadMessages = async () => {
   try {
-    const token = localStorage.getItem('user_token')
-    const response = await fetch(`${API_BASE}/api/user/alerts`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    })
-    const data = await response.json()
-    if (data.code === 200) {
-      messages.value = data.data
+    const response = await getAlerts()
+    if (response.code === 200) {
+      messages.value = response.data
     }
   } catch (error) {
     console.error('加载消息失败:', error)
@@ -292,18 +286,27 @@ const loadMessages = async () => {
 
 const loadChatHistory = async () => {
   try {
-    const token = localStorage.getItem('user_token')
-    const response = await fetch(`${API_BASE}/api/user/chat/list`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    })
-    const data = await response.json()
-    if (data.code === 200) {
-      chatHistory.value = data.data
+    const response = await getChatList()
+    if (response.code === 200) {
+      chatHistory.value = response.data
     }
   } catch (error) {
     console.error('加载聊天记录失败:', error)
+  }
+}
+
+const loadAlertSettings = async () => {
+  try {
+    const response = await getAlertSettings()
+    if (response.code === 200) {
+      const data = response.data
+      alertSettings.frequency = data.frequency || '实时预警'
+      alertSettings.methods = data.methods || ['站内信']
+      alertSettings.soundEnabled = data.sound_enabled ?? true
+      alertSettings.magnitudeThreshold = data.magnitude_threshold || 3.0
+    }
+  } catch (error) {
+    console.error('加载预警设置失败:', error)
   }
 }
 
@@ -344,15 +347,8 @@ const showDeleteConfirm = () => {
 
 const cancelSubscription = async (id) => {
   try {
-    const token = localStorage.getItem('user_token')
-    const response = await fetch(`${API_BASE}/api/user/subscribe/${id}`, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    })
-    const data = await response.json()
-    if (data.code === 200) {
+    const response = await unsubscribeProvince(id)
+    if (response.code === 200) {
       ElMessage.success('取消订阅成功')
       loadSubscriptions()
     }
@@ -361,21 +357,26 @@ const cancelSubscription = async (id) => {
   }
 }
 
-const saveAlertSettings = () => {
-  ElMessage.success('预警设置保存成功')
+const saveAlertSettings = async () => {
+  try {
+    const response = await updateAlertSettings({
+      frequency: alertSettings.frequency,
+      methods: alertSettings.methods,
+      sound_enabled: alertSettings.soundEnabled,
+      magnitude_threshold: alertSettings.magnitudeThreshold
+    })
+    if (response.code === 200) {
+      ElMessage.success('预警设置保存成功')
+    }
+  } catch (error) {
+    console.error('保存预警设置失败:', error)
+  }
 }
 
 const markRead = async (id) => {
   try {
-    const token = localStorage.getItem('user_token')
-    const response = await fetch(`${API_BASE}/api/user/alerts/${id}/read`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    })
-    const data = await response.json()
-    if (data.code === 200) {
+    const response = await markAlertRead(id)
+    if (response.code === 200) {
       ElMessage.success('标记成功')
       loadMessages()
     }
@@ -386,15 +387,8 @@ const markRead = async (id) => {
 
 const markAllRead = async () => {
   try {
-    const token = localStorage.getItem('user_token')
-    const response = await fetch(`${API_BASE}/api/user/alerts/read-all`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    })
-    const data = await response.json()
-    if (data.code === 200) {
+    const response = await markAllAlertsRead()
+    if (response.code === 200) {
       ElMessage.success('全部标记成功')
       loadMessages()
     }
@@ -414,41 +408,3 @@ const deleteChatMessage = async (id) => {
   }).catch(() => {})
 }
 </script>
-
-<style scoped>
-.profile-container {
-  padding: 20px;
-}
-
-.menu-card {
-  position: sticky;
-  top: 20px;
-}
-
-.content-card {
-  min-height: 600px;
-}
-
-.card-header h2 {
-  margin: 0;
-  font-size: 20px;
-  color: #303133;
-}
-
-.content-section {
-  padding: 20px;
-}
-
-.avatar-uploader {
-  display: inline-block;
-}
-
-.message-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  font-size: 16px;
-  font-weight: 600;
-}
-</style>

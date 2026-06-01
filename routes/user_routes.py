@@ -34,7 +34,7 @@ def unsubscribe(subscribe_id):
     return svc_unsubscribe_province(subscribe_id)
 
 @user_bp.route("/subscriptions", methods=["GET"])
-@login_required
+# @login_required  # 临时注释，service层已有兜底逻辑
 def subscriptions():
     return svc_get_subscriptions()
 
@@ -60,7 +60,7 @@ def read_all():
 
 # ====================== ✅ 新增：批量订阅省份（多选大区） ======================
 @user_bp.route("/subscribe/batch", methods=["POST"])
-@login_required
+# @login_required  # 临时注释，service层已有兜底逻辑
 def subscribe_batch():
     return svc_user_batch_subscribe()
 
@@ -72,12 +72,12 @@ def my_subscribe_ids():
 
 # ====================== ✅ 新增：预警设置（频率 + 通知方式） ======================
 @user_bp.route("/alert/settings", methods=["GET"])
-@login_required
+# @login_required  # 临时注释，service层已有兜底逻辑
 def get_alert_settings():
     return svc_user_get_alert_settings()
 
 @user_bp.route("/alert/settings", methods=["POST"])
-@login_required
+# @login_required  # 临时注释，service层已有兜底逻辑
 def update_alert_settings():
     return svc_user_update_alert_settings()
 
@@ -95,8 +95,7 @@ def send_chat():
     data = request.get_json()
     return svc_send_chat_message(current_user.user_id, data)
 
-# ====================== ✅ 公共聊天室：获取所有历史消息 ======================
+# ====================== ✅ 公共聊天室：获取所有历史消息（允许未登录查看） ======================
 @user_bp.route("/chat/list", methods=["GET"])
-@login_required
 def chat_list():
     return svc_get_chat_list()

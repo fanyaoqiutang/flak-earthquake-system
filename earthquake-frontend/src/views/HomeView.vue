@@ -1,6 +1,6 @@
 <template>
   <div class="home-container">
-    <!-- 统计卡片（缩小高度，更紧凑） -->
+    <!-- 统计卡片 -->
     <div class="stats-row">
       <div class="stat-item">
         <div class="stat-num">{{ earthquakeData.length }}</div>
@@ -42,15 +42,15 @@
       <button class="reset-btn" @click="resetFilter">重置筛选</button>
     </div>
 
-    <!-- 两栏布局（地图占绝对主体，侧边栏极简） -->
+    <!-- 两栏布局 -->
     <div class="two-columns">
-      <!-- 左侧：超大地图 -->
+      <!-- 左侧：地图 -->
       <div class="left-col">
         <div class="section-title">📍 地震分布地图</div>
         <div id="mapContainer" class="map-box" ref="mapContainer"></div>
       </div>
 
-      <!-- 右侧：只保留地震列表 -->
+      <!-- 右侧：地震列表 -->
       <div class="right-col">
         <div class="quake-list-card">
           <div class="card-title">近期地震信息</div>
@@ -73,6 +73,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { getEarthquakeList } from '../API/common'
 
 const timeFilter = ref('1y')
 const magFilter = ref('0')
@@ -81,17 +82,10 @@ const mapContainer = ref(null)
 let map = null
 let markers = []
 
-const earthquakeData = ref([
-  { id: 1, location: '新疆乌鲁木齐市沙依巴克区', magnitude: 3.9, depth: 30, time: '2026-05-18 16:32:28', lat: 43.67, lng: 87.42 },
-  { id: 2, location: '新疆阿克苏地区库车市', magnitude: 4.1, depth: 15, time: '2026-05-18 13:09:20', lat: 41.37, lng: 83.92 },
-  { id: 3, location: '新疆阿克苏地区库车市', magnitude: 4.5, depth: 13, time: '2026-05-18 13:07:27', lat: 41.40, lng: 83.96 },
-  { id: 4, location: '缅甸', magnitude: 5.2, depth: 10, time: '2026-05-18 10:05:24', lat: 16.55, lng: 96.25 },
-  { id: 5, location: '广西柳州市柳南区', magnitude: 3.3, depth: 10, time: '2026-05-18 07:41:44', lat: 24.40, lng: 109.27 },
-  { id: 6, location: '四川甘孜州泸定县', magnitude: 4.8, depth: 18, time: '2026-05-17 22:15:33', lat: 29.85, lng: 102.12 },
-  { id: 7, location: '西藏日喀则市定日县', magnitude: 3.7, depth: 8, time: '2026-05-17 18:42:11', lat: 28.66, lng: 87.08 }
-])
+const earthquakeData = ref([])
 
 const maxMagnitude = computed(() => {
+  if (earthquakeData.value.length === 0) return '0.0'
   return Math.max(...earthquakeData.value.map(e => e.magnitude)).toFixed(1)
 })
 
@@ -105,7 +99,7 @@ const filteredEarthquakes = computed(() => {
   const threshold = new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
 
   return earthquakeData.value.filter(item => {
-    const itemTime = new Date(item.time)
+    const itemTime = new Date(item.earthquake_time || item.time)
     const timeMatch = itemTime >= threshold
 
     let magMatch = true
@@ -127,6 +121,27 @@ const resetFilter = () => {
   magFilter.value = '0'
 }
 
+// API数据到前端格式的转换
+const loadEarthquakeData = async () => {
+  try {
+    const response = await getEarthquakeList()
+    if (response.code === 200) {
+      earthquakeData.value = response.data.map(item => ({
+        id: item.earthquake_id,
+        location: item.province_name || item.location,
+        magnitude: item.magnitude,
+        depth: item.depth,
+        time: item.earthquake_time,
+        lat: item.latitude,
+        lng: item.longitude
+      }))
+    }
+  } catch (error) {
+    console.error('加载地震数据失败:', error)
+  }
+}
+
+// 地图初始化
 const initMap = () => {
   const script = document.createElement('script')
   script.src = `https://webapi.amap.com/maps?v=2.0&key=a93d4f6da8bb5b797ff17210a9e21fdd&plugin=AMap.Scale,AMap.ToolBar`
@@ -195,6 +210,7 @@ watch(filteredEarthquakes, () => {
 })
 
 onMounted(() => {
+  loadEarthquakeData()
   setTimeout(() => initMap(), 200)
 })
 
@@ -219,7 +235,7 @@ onBeforeUnmount(() => {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
-/* 统计卡片（缩小高度） */
+/* 统计卡片 */
 .stats-row {
   display: flex;
   gap: 1px;
@@ -320,7 +336,7 @@ onBeforeUnmount(() => {
   flex: 1;
 }
 
-/* 地图（高度放大，几乎占满页面） */
+/* 地图 */
 .section-title {
   font-size: 14px;
   font-weight: 500;

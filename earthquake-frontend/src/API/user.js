@@ -44,6 +44,15 @@ export function subscribeProvince(data) {
   })
 }
 
+// 批量订阅省份
+export function subscribeBatch(data) {
+  return request({
+    url: '/api/user/subscribe/batch',
+    method: 'post',
+    data
+  })
+}
+
 // 取消订阅
 export function unsubscribeProvince(subscribeId) {
   return request({
@@ -60,11 +69,36 @@ export function getSubscriptions() {
   })
 }
 
+// 获取我的订阅ID列表
+export function getMySubscribeIds() {
+  return request({
+    url: '/api/user/subscribe/my',
+    method: 'get'
+  })
+}
+
 // 获取预警列表
 export function getAlerts() {
   return request({
     url: '/api/user/alerts',
     method: 'get'
+  })
+}
+
+// 获取预警设置
+export function getAlertSettings() {
+  return request({
+    url: '/api/user/alert/settings',
+    method: 'get'
+  })
+}
+
+// 更新预警设置
+export function updateAlertSettings(data) {
+  return request({
+    url: '/api/user/alert/settings',
+    method: 'post',
+    data
   })
 }
 
@@ -81,6 +115,14 @@ export function markAllAlertsRead() {
   return request({
     url: '/api/user/alerts/read-all',
     method: 'post'
+  })
+}
+
+// 获取未读预警数量
+export function getUnreadAlertsCount() {
+  return request({
+    url: '/api/user/alerts/unread',
+    method: 'get'
   })
 }
 

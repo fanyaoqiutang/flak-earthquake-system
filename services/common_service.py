@@ -49,13 +49,29 @@ def svc_get_all_provinces():
 # 【新增】按地理大区分组获取省份（用于前端折叠面板）
 # ==========================
 def svc_get_provinces_group_by_region():
+    # 定义7大地区
     regions = [
         "东北地区", "华东地区", "华中地区",
         "华南地区", "西南地区", "西北地区", "港澳台地区"
     ]
+    
     result = []
+    
     for region_name in regions:
+        # 查询该地区的省份
         provinces = Province.query.filter_by(region=region_name).all()
+        
+        # 如果该地区没有省份，尝试查询region为NULL或空的省份
+        if not provinces and region_name == "华北地区":
+            # 华北地区作为默认地区，包含所有未分类的省份
+            provinces = Province.query.filter(
+                db.or_(
+                    Province.region == None,
+                    Province.region == '',
+                    Province.region == '华北地区'
+                )
+            ).all()
+        
         result.append({
             "region_name": region_name,
             "province_list": [
@@ -63,6 +79,15 @@ def svc_get_provinces_group_by_region():
                 for p in provinces
             ]
         })
+    
+    # 如果所有地区都没有数据，返回所有省份到华北地区
+    if all(len(r["province_list"]) == 0 for r in result):
+        all_provinces = Province.query.all()
+        result[0]["province_list"] = [
+            {"province_id": p.province_id, "province_name": p.province_name}
+            for p in all_provinces
+        ]
+    
     return jsonify({"code": 200, "data": result})
 
 

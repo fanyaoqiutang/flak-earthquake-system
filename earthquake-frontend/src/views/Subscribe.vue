@@ -34,7 +34,7 @@
                 :key="sub"
                 class="subscribe-item"
               >
-                <span class="province-name">{{ sub }}</span>
+                <span class="province-name">{{ sub.province_name }}</span>
                 <el-button
                   type="danger"
                   size="small"
@@ -101,22 +101,66 @@
       </div>
     </div>
 
-    <!-- 订阅管理对话框 -->
-    <el-dialog v-model="dialogVisible" title="管理订阅省份" width="600px">
-      <div class="province-grid">
+    <!-- 订阅管理对话框 - 按地区分类 -->
+    <el-dialog
+      v-model="dialogVisible"
+      title="省份订阅（多选）"
+      width="800px"
+      :z-index="3000"
+      destroy-on-close
+      class="subscribe-dialog"
+    >
+      <div class="region-list" v-loading="loadingRegions">
         <div
-          v-for="province in allProvinces"
-          :key="province"
-          :class="['province-chip', { selected: subscriptions.includes(province) }]"
-          @click="toggleSubscribe(province)"
+          v-for="region in regionData"
+          :key="region.region_name"
+          class="region-section"
         >
-          {{ province }}
-          <el-icon v-if="subscriptions.includes(province)" class="check-icon"><Check /></el-icon>
+          <!-- 地区标题栏 -->
+          <div class="region-header">
+            <div class="region-title">
+              <span class="region-name">{{ region.region_name }}</span>
+              <el-checkbox
+                :model-value="isRegionAllSelected(region)"
+                :indeterminate="isRegionPartiallySelected(region)"
+                @change="toggleRegion(region)"
+                class="select-all-checkbox"
+              >
+                全选
+              </el-checkbox>
+            </div>
+          </div>
+
+          <!-- 省份网格 -->
+          <div class="province-grid">
+            <div
+              v-for="province in region.province_list"
+              :key="province.province_id"
+              class="province-item"
+            >
+              <el-checkbox
+                :model-value="selectedProvinceIds.includes(province.province_id)"
+                @change="toggleProvince(province)"
+              >
+                {{ province.province_name }}
+              </el-checkbox>
+            </div>
+          </div>
         </div>
+
+        <el-empty v-if="regionData.length === 0" description="暂无地区数据" />
       </div>
+
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="saveSubscriptions">保存</el-button>
+        <div class="dialog-footer">
+          <div class="selected-count">
+            已选择 <span class="count-num">{{ selectedProvinceIds.length }}</span> 个省份
+          </div>
+          <div class="dialog-buttons">
+            <el-button @click="dialogVisible = false">取消</el-button>
+            <el-button type="primary" @click="saveSubscriptions" :loading="saving">保存</el-button>
+          </div>
+        </div>
       </template>
     </el-dialog>
 
@@ -156,11 +200,20 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Lock, Bell, VideoCamera, Check } from '@element-plus/icons-vue'
+import {
+  getSubscriptions,
+  subscribeBatch,
+  unsubscribeProvince,
+  getAlertSettings,
+  updateAlertSettings
+} from '../API/user'
 
 const router = useRouter()
 const dialogVisible = ref(false)
 const alertDialogVisible = ref(false)
 const countdownSeconds = ref(25)
+const saving = ref(false)
+const loadingRegions = ref(false)
 
 const currentUser = ref('')
 const userRole = ref('')
@@ -169,12 +222,9 @@ const isLoggedIn = computed(() => {
   return localStorage.getItem('user_token') || localStorage.getItem('admin_token')
 })
 
-const subscriptions = ref(['四川省', '云南省'])
-const allProvinces = ref([
-  '四川省', '云南省', '新疆', '西藏', '青海', '甘肃',
-  '陕西', '山西', '河北', '山东', '河南', '湖北',
-  '湖南', '广西', '贵州', '重庆', '内蒙古', '宁夏'
-])
+const subscriptions = ref([])
+const regionData = ref([])
+const selectedProvinceIds = ref([])
 
 const settings = ref({
   pushNotify: true,
@@ -190,13 +240,92 @@ const currentAlert = ref({
   tip: ''
 })
 
+// 内联省份地区数据（避免后端接口调用失败）
+const defaultRegionData = [
+  {
+    region_name: "华北地区",
+    province_list: [
+      { province_id: 1, province_name: "北京市" },
+      { province_id: 2, province_name: "天津市" },
+      { province_id: 3, province_name: "河北省" },
+      { province_id: 4, province_name: "山西省" },
+      { province_id: 5, province_name: "内蒙古自治区" }
+    ]
+  },
+  {
+    region_name: "东北地区",
+    province_list: [
+      { province_id: 6, province_name: "辽宁省" },
+      { province_id: 7, province_name: "吉林省" },
+      { province_id: 8, province_name: "黑龙江省" }
+    ]
+  },
+  {
+    region_name: "华东地区",
+    province_list: [
+      { province_id: 9, province_name: "上海市" },
+      { province_id: 10, province_name: "江苏省" },
+      { province_id: 11, province_name: "浙江省" },
+      { province_id: 12, province_name: "安徽省" },
+      { province_id: 13, province_name: "福建省" },
+      { province_id: 14, province_name: "江西省" },
+      { province_id: 15, province_name: "山东省" }
+    ]
+  },
+  {
+    region_name: "华中地区",
+    province_list: [
+      { province_id: 16, province_name: "河南省" },
+      { province_id: 17, province_name: "湖北省" },
+      { province_id: 18, province_name: "湖南省" }
+    ]
+  },
+  {
+    region_name: "华南地区",
+    province_list: [
+      { province_id: 19, province_name: "广东省" },
+      { province_id: 20, province_name: "广西壮族自治区" },
+      { province_id: 21, province_name: "海南省" }
+    ]
+  },
+  {
+    region_name: "西南地区",
+    province_list: [
+      { province_id: 22, province_name: "重庆市" },
+      { province_id: 23, province_name: "四川省" },
+      { province_id: 24, province_name: "贵州省" },
+      { province_id: 25, province_name: "云南省" },
+      { province_id: 26, province_name: "西藏自治区" }
+    ]
+  },
+  {
+    region_name: "西北地区",
+    province_list: [
+      { province_id: 27, province_name: "陕西省" },
+      { province_id: 28, province_name: "甘肃省" },
+      { province_id: 29, province_name: "青海省" },
+      { province_id: 30, province_name: "宁夏回族自治区" },
+      { province_id: 31, province_name: "新疆维吾尔自治区" }
+    ]
+  },
+  {
+    region_name: "港澳台地区",
+    province_list: [
+      { province_id: 32, province_name: "台湾省" },
+      { province_id: 33, province_name: "香港特别行政区" },
+      { province_id: 34, province_name: "澳门特别行政区" }
+    ]
+  }
+]
+
 onMounted(() => {
   loadUserInfo()
-  loadSubscriptions()
-  // 模拟订阅省份地震预警
-  setTimeout(() => {
-    simulateEarthquakeAlert()
-  }, 3000)
+  // 直接使用内联数据
+  regionData.value = defaultRegionData
+  if (isLoggedIn.value) {
+    loadSubscriptions()
+    loadAlertSettings()
+  }
 })
 
 const loadUserInfo = () => {
@@ -212,59 +341,166 @@ const loadUserInfo = () => {
   }
 }
 
-const loadSubscriptions = () => {
+const loadSubscriptions = async () => {
   if (!isLoggedIn.value) return
 
-  fetch('http://127.0.0.1:5000/api/user/subscriptions', {
-    credentials: 'include'
-  })
-  .then(res => res.json())
-  .then(data => {
-    if (data.code === 200) {
-      subscriptions.value = data.data.map(item => item.province_name)
+  try {
+    const response = await getSubscriptions()
+    console.log('订阅列表响应:', response)
+    if (response.code === 200) {
+      subscriptions.value = response.data
+      // 提取已订阅的省份ID，确保是数组
+      selectedProvinceIds.value = Array.isArray(response.data)
+        ? response.data.map(item => item.province_id)
+        : []
+      console.log('已订阅省份ID:', selectedProvinceIds.value)
     }
-  })
-  .catch(err => console.error('加载订阅失败:', err))
+  } catch (err) {
+    console.error('加载订阅失败:', err)
+    // 确保即使失败也是空数组
+    selectedProvinceIds.value = []
+  }
 }
 
-const showSubscribeDialog = () => {
-  if (!isLoggedIn.value) {
+const loadAlertSettings = async () => {
+  if (!isLoggedIn.value) return
+
+  try {
+    const response = await getAlertSettings()
+    if (response.code === 200) {
+      const data = response.data
+      settings.value.pushNotify = data.push_notify || true
+      settings.value.soundAlert = data.sound_alert || true
+      settings.value.threshold = String(data.magnitude_threshold || 5)
+    }
+  } catch (err) {
+    console.error('加载预警设置失败:', err)
+  }
+}
+
+const showSubscribeDialog = async () => {
+  // 检查登录状态
+  const hasUserToken = localStorage.getItem('user_token')
+  const hasAdminToken = localStorage.getItem('admin_token')
+
+  console.log('点击管理订阅省份 - 当前登录状态:', {
+    hasUserToken: !!hasUserToken,
+    hasAdminToken: !!hasAdminToken
+  })
+
+  if (!hasUserToken && !hasAdminToken) {
     ElMessage.warning('请先登录后再管理订阅')
     router.push('/login')
     return
   }
-  dialogVisible.value = true
-}
 
-const toggleSubscribe = (province) => {
-  const index = subscriptions.value.indexOf(province)
-  if (index > -1) {
-    subscriptions.value.splice(index, 1)
-  } else {
-    subscriptions.value.push(province)
+  // 如果是admin，提示
+  if (hasAdminToken && !hasUserToken) {
+    ElMessage.warning('请使用普通用户账号登录后再管理订阅')
+    return
+  }
+
+  try {
+    dialogVisible.value = true
+    console.log('对话框已打开')
+  } catch (error) {
+    console.error('打开对话框失败:', error)
+    ElMessage.error('打开对话框失败')
   }
 }
 
-const removeSubscription = (province) => {
-  subscriptions.value = subscriptions.value.filter(p => p !== province)
-  ElMessage.success(`已取消订阅: ${province}`)
+// 判断地区是否全部选中
+const isRegionAllSelected = (region) => {
+  if (!Array.isArray(selectedProvinceIds.value) || region.province_list.length === 0) return false
+  return region.province_list.every(p => selectedProvinceIds.value.includes(p.province_id))
 }
 
-const saveSubscriptions = () => {
-  ElMessage.success('订阅设置已保存')
-  dialogVisible.value = false
+// 判断地区是否部分选中
+const isRegionPartiallySelected = (region) => {
+  if (!Array.isArray(selectedProvinceIds.value)) return false
+  const selectedCount = region.province_list.filter(p => selectedProvinceIds.value.includes(p.province_id)).length
+  return selectedCount > 0 && selectedCount < region.province_list.length
 }
 
-// 模拟订阅省份地震预警弹窗
+// 切换整个地区的选中状态
+const toggleRegion = (region) => {
+  if (!Array.isArray(selectedProvinceIds.value)) {
+    selectedProvinceIds.value = []
+  }
+
+  const allSelected = isRegionAllSelected(region)
+
+  if (allSelected) {
+    // 取消该地区所有省份
+    region.province_list.forEach(p => {
+      const index = selectedProvinceIds.value.indexOf(p.province_id)
+      if (index > -1) {
+        selectedProvinceIds.value.splice(index, 1)
+      }
+    })
+  } else {
+    // 选中该地区所有省份
+    region.province_list.forEach(p => {
+      if (!selectedProvinceIds.value.includes(p.province_id)) {
+        selectedProvinceIds.value.push(p.province_id)
+      }
+    })
+  }
+}
+
+// 切换单个省份
+const toggleProvince = (province) => {
+  if (!Array.isArray(selectedProvinceIds.value)) {
+    selectedProvinceIds.value = []
+  }
+
+  const index = selectedProvinceIds.value.indexOf(province.province_id)
+  if (index > -1) {
+    selectedProvinceIds.value.splice(index, 1)
+  } else {
+    selectedProvinceIds.value.push(province.province_id)
+  }
+}
+
+const removeSubscription = async (sub) => {
+  try {
+    await unsubscribeProvince(sub.id)
+    ElMessage.success(`已取消订阅: ${sub.province_name}`)
+    loadSubscriptions()
+  } catch (err) {
+    console.error('取消订阅失败:', err)
+    ElMessage.error('取消订阅失败')
+  }
+}
+
+const saveSubscriptions = async () => {
+  try {
+    saving.value = true
+
+    // 传递省份ID数组给后端
+    await subscribeBatch({ province_ids: selectedProvinceIds.value })
+
+    ElMessage.success('订阅设置已保存')
+    dialogVisible.value = false
+    loadSubscriptions()
+  } catch (err) {
+    console.error('保存订阅失败:', err)
+    ElMessage.error('保存订阅失败')
+  } finally {
+    saving.value = false
+  }
+}
+
 const simulateEarthquakeAlert = () => {
-  // 随机选择一个订阅的省份作为预警目标
-  const randomProvince = subscriptions.value[Math.floor(Math.random() * subscriptions.value.length)]
+  if (subscriptions.value.length === 0) return
+
+  const randomSub = subscriptions.value[Math.floor(Math.random() * subscriptions.value.length)]
 
   currentAlert.value = {
-    province: randomProvince,
+    province: randomSub.province_name,
     magnitude: '5.2',
     time: new Date().toLocaleString('zh-CN'),
-    location: `${randomProvince}雅安市`,
+    location: `${randomSub.province_name}某市`,
     tip: '请当地居民注意防范，做好应急准备'
   }
 
@@ -272,7 +508,6 @@ const simulateEarthquakeAlert = () => {
   startCountdown()
 }
 
-// 预警弹窗倒计时
 const startCountdown = () => {
   countdownSeconds.value = 25
   const timer = setInterval(() => {
@@ -489,6 +724,106 @@ const confirmAlert = () => {
   top: 4px;
   right: 4px;
   font-size: 16px;
+}
+
+/* 地区列表样式 */
+.region-list {
+  max-height: 500px;
+  overflow-y: auto;
+  padding: 0 10px;
+}
+
+.region-section {
+  margin-bottom: 24px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid #e9ecef;
+}
+
+.region-section:last-child {
+  margin-bottom: 0;
+}
+
+.region-header {
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #409eff;
+}
+
+.region-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.region-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.region-name::before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 16px;
+  background: #409eff;
+  border-radius: 2px;
+}
+
+.select-all-checkbox {
+  font-size: 14px;
+  color: #409eff;
+}
+
+.province-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+  padding-left: 12px;
+}
+
+.province-item {
+  padding: 8px 12px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e4e7ed;
+  transition: all 0.3s;
+}
+
+.province-item:hover {
+  border-color: #409eff;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.1);
+}
+
+/* 对话框底部 */
+.dialog-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 16px;
+  border-top: 1px solid #e4e7ed;
+}
+
+.selected-count {
+  font-size: 14px;
+  color: #606266;
+}
+
+.count-num {
+  font-size: 20px;
+  font-weight: 600;
+  color: #409eff;
+  margin: 0 4px;
+}
+
+.dialog-buttons {
+  display: flex;
+  gap: 12px;
 }
 
 /* 预警弹窗样式 */
