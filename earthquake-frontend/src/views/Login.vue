@@ -141,8 +141,8 @@ const handleLogin = async () => {
       : '/api/admin/login'
 
     const body = loginType.value === 'user'
-      ? { user_account: form.account, password: form.password }
-      : { admin_account: form.account, password: form.password }
+  ? { user_account: form.account, password: form.password }
+  : { admin_account: form.account, password: form.password, admin_key: form.adminKey }
 
     const response = await fetch(`${API_BASE}${endpoint}`, {
       method: 'POST',

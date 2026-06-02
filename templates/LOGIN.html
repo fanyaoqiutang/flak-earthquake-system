@@ -410,9 +410,15 @@ window.onload = function () {
 
 // ====================== 图表 ======================
 function loadCharts(){
-    fetch("/api/earthquake/stats/province",{credentials:"include"}).then(r=>r.json()).then(d=>{
+      fetch("/api/earthquake/stats/province",{credentials:"include"}).then(r=>r.json()).then(d=>{
+        let xData = d.data.map(item => item.name);
+        let yData = d.data.map(item => item.value);
         let chart = echarts.init(document.getElementById("pieChart"));
-        chart.setOption({ series:[{type:"pie",data:d.data}] });
+        chart.setOption({
+            xAxis: { data: xData, axisLabel: { rotate: 30 } }, // 文字旋转防重叠
+            yAxis: {},
+            series:[{type:"bar", data: yData}] // type 改为 bar
+        });
     });
     fetch("/api/earthquake/stats/trend",{credentials:"include"}).then(r=>r.json()).then(d=>{
         let x = d.data.map(i=>i.date); let y = d.data.map(i=>i.count);

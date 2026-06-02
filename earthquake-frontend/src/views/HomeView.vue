@@ -73,6 +73,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import axios from 'axios'
 
 const timeFilter = ref('1y')
 const magFilter = ref('0')
@@ -81,40 +82,29 @@ const mapContainer = ref(null)
 let map = null
 let markers = []
 
-const earthquakeData = ref([
-  { id: 1, location: '新疆乌鲁木齐市沙依巴克区', magnitude: 3.9, depth: 30, time: '2026-05-18 16:32:28', lat: 43.67, lng: 87.42 },
-  { id: 2, location: '新疆阿克苏地区库车市', magnitude: 4.1, depth: 15, time: '2026-05-18 13:09:20', lat: 41.37, lng: 83.92 },
-  { id: 3, location: '新疆阿克苏地区库车市', magnitude: 4.5, depth: 13, time: '2026-05-18 13:07:27', lat: 41.40, lng: 83.96 },
-  { id: 4, location: '缅甸', magnitude: 5.2, depth: 10, time: '2026-05-18 10:05:24', lat: 16.55, lng: 96.25 },
-  { id: 5, location: '广西柳州市柳南区', magnitude: 3.3, depth: 10, time: '2026-05-18 07:41:44', lat: 24.40, lng: 109.27 },
-  { id: 6, location: '四川甘孜州泸定县', magnitude: 4.8, depth: 18, time: '2026-05-17 22:15:33', lat: 29.85, lng: 102.12 },
-  { id: 7, location: '西藏日喀则市定日县', magnitude: 3.7, depth: 8, time: '2026-05-17 18:42:11', lat: 28.66, lng: 87.08 }
-])
+// 1.清空本地模拟数组
+const earthquakeData = ref([])
 
+// 2.请求后端接口函数
+const getEarthquake = async () => {
+  const params = {
+    time: timeFilter.value,
+    mag_min: Number(magFilter.value)
+  }
+  const res = await axios.get('/api/earthquake', { params })
+  if (res.data.code === 200) {
+    earthquakeData.value = res.data.data
+  }
+}
+
+// 最大震级不变，前端计算
 const maxMagnitude = computed(() => {
+  if (!earthquakeData.value.length) return '0.0'
   return Math.max(...earthquakeData.value.map(e => e.magnitude)).toFixed(1)
 })
 
-const filteredEarthquakes = computed(() => {
-  const now = new Date()
-  let days = 365
-  if (timeFilter.value === '24h') days = 1
-  else if (timeFilter.value === '7d') days = 7
-  else if (timeFilter.value === '30d') days = 30
-
-  const threshold = new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
-
-  return earthquakeData.value.filter(item => {
-    const itemTime = new Date(item.time)
-    const timeMatch = itemTime >= threshold
-
-    let magMatch = true
-    if (magFilter.value === '3') magMatch = item.magnitude >= 3
-    else if (magFilter.value === '5') magMatch = item.magnitude >= 5
-
-    return timeMatch && magMatch
-  })
-})
+// 3.【关键删除】去掉前端filteredEarthquakes筛选，直接用后端返回数据
+const filteredEarthquakes = computed(() => earthquakeData.value)
 
 const getMagClass = (mag) => {
   if (mag >= 5) return 'high'
@@ -190,12 +180,19 @@ const addMarkers = () => {
   }
 }
 
+// 筛选改变重新请求接口
+watch([timeFilter, magFilter], () => {
+  getEarthquake()
+})
+
+// 数据刷新重新绘制地图
 watch(filteredEarthquakes, () => {
   if (map) addMarkers()
 })
 
 onMounted(() => {
   setTimeout(() => initMap(), 200)
+  getEarthquake() //页面加载立刻请求数据
 })
 
 onBeforeUnmount(() => {

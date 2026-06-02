@@ -41,12 +41,12 @@ def delete_eq():
 def admin_user_list():
     return svc_admin_get_all_users()
 
-# 👇 新增：用户统计（总用户、活跃、禁用）
+# 新增：用户统计（总用户、活跃、禁用）
 @admin_bp.route("/user/stats", methods=["GET"])
 def admin_user_stats():
     return svc_admin_get_user_stats()
 
-# 👇 新增：切换用户状态（正常 / 禁用）
+# 新增：切换用户状态（正常 / 禁用）
 @admin_bp.route("/user/status/<int:user_id>", methods=["POST"])
 def admin_user_status(user_id):
     return svc_admin_toggle_user_status(user_id)

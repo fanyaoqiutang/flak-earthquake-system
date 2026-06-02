@@ -59,7 +59,7 @@ def svc_user_info():
     return jsonify({"code": 200, "data": {"user_id": current_user.user_id, "user_account": current_user.user_account}})
 
 
-# ====================== 单省份订阅（保留兼容） ======================
+# ====================== 订阅 ======================
 def svc_subscribe_province():
     data = request.get_json(force=True)
     province_id = data.get('province_id')
@@ -88,7 +88,7 @@ def svc_subscribe_province():
     db.session.commit()
     return jsonify({"code": 200, "msg": "订阅成功"})
 
-
+# 取消订阅
 def svc_unsubscribe_province(subscribe_id):
     sub = UserSubscribeProvince.query.get(subscribe_id)
     if not sub or sub.user_id != current_user.user_id:
@@ -97,7 +97,7 @@ def svc_unsubscribe_province(subscribe_id):
     db.session.commit()
     return jsonify({"code": 200, "msg": "取消订阅成功"})
 
-
+# 获取当前登录用户的省份订阅列表
 def svc_get_subscriptions():
     subs = UserSubscribeProvince.query.filter_by(user_id=current_user.user_id).all()
     res = []
@@ -106,8 +106,7 @@ def svc_get_subscriptions():
         res.append({"id": s.id, "province_id": s.province_id, "province_name": p.province_name if p else "未知"})
     return jsonify({"code": 200, "data": res})
 
-
-# ====================== 【新增】批量订阅（支持多选大区） ======================
+# ====================== 批量订阅 ======================
 def svc_user_batch_subscribe():
     user_id = current_user.user_id
     province_ids = request.get_json().get("province_ids", [])
@@ -124,7 +123,7 @@ def svc_user_batch_subscribe():
     return jsonify({"code": 200, "msg": "订阅已更新"})
 
 
-# ====================== 【新增】获取我的订阅ID列表（用于前端回显勾选） ======================
+# ====================== 获取订阅ID列表 ======================
 def svc_user_my_subscribe_ids():
     subs = UserSubscribeProvince.query.filter_by(user_id=current_user.user_id).all()
     pids = [s.province_id for s in subs]
@@ -132,6 +131,7 @@ def svc_user_my_subscribe_ids():
 
 
 # ====================== 预警 ======================
+# 预警
 def svc_get_user_alerts():
     alerts = UserEarthquakeAlert.query.filter_by(user_id=current_user.user_id).order_by(
         UserEarthquakeAlert.id.desc()).all()
@@ -173,7 +173,7 @@ def svc_mark_all_alerts_read():
     return jsonify({"code": 200, "msg": "全部已读"})
 
 
-# ====================== 【新增】预警设置（频率 + 通知方式） ======================
+# ====================== 预警设置======================
 def svc_user_get_alert_settings():
     return jsonify({
         "code": 200,

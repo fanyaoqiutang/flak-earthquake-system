@@ -1,53 +1,72 @@
 from flask import request, jsonify
 from models import EarthquakeInfo, Province, db
 from sqlalchemy import func, and_
-from datetime import datetime
+from datetime import datetime,timedelta
 
-
-# ==========================
-# 公共服务：地震列表（支持按省份筛选）
-# ==========================
+# 地震列表信息按条件筛查
+# 地震列表信息按条件筛查
 def svc_list_earthquake():
     province_id = request.args.get('province_id')
+    province_name = request.args.get('province_name', '').strip()
+    # 新增前端传参
+    time_scope = request.args.get("time", "1y")   # 24h/7d/30d/1y
+    mag_min = request.args.get("mag_min", type=float, default=0)
 
-    query = EarthquakeInfo.query.order_by(EarthquakeInfo.earthquake_time.desc())
+    query = EarthquakeInfo.query.join(Province, EarthquakeInfo.province_id == Province.province_id)
+    query = query.order_by(EarthquakeInfo.earthquake_time.desc())
 
+    # ====== 新增：时间筛选 ======
+    now = datetime.now()
+    if time_scope == "24h":
+        start = now - timedelta(days=1)
+    elif time_scope == "7d":
+        start = now - timedelta(days=7)
+    elif time_scope == "30d":
+        start = now - timedelta(days=30)
+    else: #1y
+        start = now - timedelta(days=365)
+    query = query.filter(EarthquakeInfo.earthquake_time >= start)
+
+    # ====== 新增：最低震级筛选 ======
+    if mag_min > 0:
+        query = query.filter(EarthquakeInfo.magnitude >= mag_min)
+
+    # 1. 按省份ID精准筛选
     if province_id:
         try:
-            query = query.filter_by(province_id=int(province_id))
-        except:
+            query = query.filter(EarthquakeInfo.province_id == int(province_id))
+        except (ValueError, TypeError):
             return jsonify({"code": 400, "msg": "省份ID格式错误"}), 400
+
+    # 2. 按省份名称模糊查询
+    if province_name:
+        like_key = f"%{province_name}%"
+        query = query.filter(Province.province_name.like(like_key))
 
     lst = query.all()
     res = []
     for eq in lst:
         p = eq.province
         res.append({
-            "earthquake_id": eq.earthquake_id,
-            "province_id": eq.province_id,
-            "province_name": p.province_name if p else "未知",
-            "earthquake_time": eq.earthquake_time.strftime("%Y-%m-%d %H:%M:%S"),
-            "latitude": eq.latitude,
-            "longitude": eq.longitude,
+            "id": eq.earthquake_id,
+            "location": p.province_name if p else "未知",
+            "time": eq.earthquake_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "lat": eq.latitude,
+            "lng": eq.longitude,
             "depth": eq.depth,
-            "magnitude": eq.magnitude,
-            "earthquake_message": eq.earthquake_message
+            "magnitude": eq.magnitude
         })
     return jsonify({"code": 200, "data": res, "total": len(res)})
 
 
-# ==========================
-# 公共服务：获取所有省份
-# ==========================
+# 查询所有省份，返回省份ID+省份名称（用于地震筛选和订阅选择）
 def svc_get_all_provinces():
     provinces = Province.query.all()
     res = [{"province_id": p.province_id, "province_name": p.province_name} for p in provinces]
     return jsonify({"code": 200, "data": res})
 
 
-# ==========================
-# 【新增】按地理大区分组获取省份（用于前端折叠面板）
-# ==========================
+# 按七大地理大区对省份分组，用于批量订阅，按大区分类
 def svc_get_provinces_group_by_region():
     regions = [
         "东北地区", "华东地区", "华中地区",
@@ -66,60 +85,64 @@ def svc_get_provinces_group_by_region():
     return jsonify({"code": 200, "data": result})
 
 
-# ==========================
-# 图表1：省份地震数量统计（饼图）
-# ==========================
+# 统计每个省份的地震次数，生成饼状图
 def svc_earthquake_stats_province():
-    data = db.session.query(
-        Province.province_name,
-        func.count(EarthquakeInfo.earthquake_id).label("count")
-    ).join(EarthquakeInfo) \
-        .group_by(Province.province_id) \
+    thirty_days_ago = datetime.now() - timedelta(days=30)
+    data = (
+        db.session.query(
+            Province.province_name,
+            func.count(EarthquakeInfo.earthquake_id).label("count")
+        )
+        .join(EarthquakeInfo)
+        # 时间过滤：仅统计近30天
+        .filter(EarthquakeInfo.earthquake_time >= thirty_days_ago)
+        .group_by(Province.province_id)
         .all()
-
+    )
     return jsonify({
         "code": 200,
         "data": [{"name": n, "value": c} for n, c in data]
     })
 
 
-# ==========================
-# 图表2：按日期统计地震趋势（折线图）
-# ==========================
+#  统计每日地震数量，生成时间趋势折线图
 def svc_earthquake_stats_trend():
-    rows = db.session.query(
-        func.date(EarthquakeInfo.earthquake_time).label("dt"),
-        func.count(EarthquakeInfo.earthquake_id)
-    ).group_by(func.date(EarthquakeInfo.earthquake_time)) \
-        .order_by("dt") \
+    # 计算30天前的时间
+    thirty_days_ago = datetime.now() - timedelta(days=30)
+
+    rows = (
+        db.session.query(
+            func.date(EarthquakeInfo.earthquake_time).label("dt"),
+            func.count(EarthquakeInfo.earthquake_id)
+        )
+        .filter(EarthquakeInfo.earthquake_time >= thirty_days_ago)
+        .group_by(func.date(EarthquakeInfo.earthquake_time))
+        .order_by("dt")
         .all()
+    )
 
     return jsonify({
         "code": 200,
         "data": [{"date": str(d), "count": c} for d, c in rows]
     })
+#
+# # 按震级大小分组统计
+# def svc_earthquake_stats_magnitude():
+#     data = db.session.query(
+#         # 震级保留一位小数再分组处理
+#         func.round(EarthquakeInfo.magnitude, 1).label("mag"),
+#         func.count(EarthquakeInfo.earthquake_id)
+#     ).group_by("mag") \
+#         .order_by("mag") \
+#         .all()
+#     # 返回柱状图
+#     return jsonify({
+#         "code": 200,
+#         "data": [{"mag": m, "count": c} for m, c in data]
+#     })
 
-
-# ==========================
-# 图表3：震级分布统计（柱状图）
-# ==========================
-def svc_earthquake_stats_magnitude():
-    data = db.session.query(
-        func.round(EarthquakeInfo.magnitude, 1).label("mag"),
-        func.count(EarthquakeInfo.earthquake_id)
-    ).group_by("mag") \
-        .order_by("mag") \
-        .all()
-
-    return jsonify({
-        "code": 200,
-        "data": [{"mag": m, "count": c} for m, c in data]
-    })
-
-
-# ==========================
-# 图表4：地震高发省份 TOP5 排名
-# ==========================
+# 地震高发省份 TOP5 排名
+# 获取震级频率最高的前五个省份信息
 def svc_earthquake_rank():
     data = db.session.query(
         Province.province_name,
@@ -131,6 +154,7 @@ def svc_earthquake_rank():
         .all()
 
     res = []
+    # 生成排名（enumerate自动生成名次）
     for idx, (name, count) in enumerate(data, 1):
         res.append({
             "rank": idx,
@@ -139,24 +163,22 @@ def svc_earthquake_rank():
         })
     return jsonify({"code": 200, "data": res})
 
-
-# ==========================
-# 【新增】综合数据统计接口（支持筛选条件）
-# ==========================
+# 统计多条件统计 支持省份，时间范围，最低震级筛选，一次返回趋势，震级，省份排行
 def svc_earthquake_statistics():
+    # 获取前端筛选参数
     province_id = request.args.get('province_id')
     start_time = request.args.get('start_time')
     end_time = request.args.get('end_time')
     mag_min = request.args.get('mag_min', 0, type=float)
 
     query = EarthquakeInfo.query
-
+    # 省份筛选
     if province_id:
         try:
             query = query.filter_by(province_id=int(province_id))
         except:
             return jsonify({"code": 400, "msg": "省份ID格式错误"}), 400
-
+    # 时间范围筛选
     if start_time and end_time:
         try:
             start_dt = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
@@ -169,7 +191,7 @@ def svc_earthquake_statistics():
             )
         except:
             return jsonify({"code": 400, "msg": "时间格式错误"}), 400
-
+    # 最低震级筛选
     if mag_min > 0:
         query = query.filter(EarthquakeInfo.magnitude >= mag_min)
 
@@ -188,17 +210,20 @@ def svc_earthquake_statistics():
         }
     })
 
+# 生成时间趋势
 
+# 趋势图
 def get_trend_data(earthquake_list):
     trend_dict = {}
+
     for eq in earthquake_list:
         date_str = eq.earthquake_time.strftime("%Y-%m-%d")
         trend_dict[date_str] = trend_dict.get(date_str, 0) + 1
-
+    # 按日期排序，列表返回
     trend_list = [{"date": k, "count": v} for k, v in sorted(trend_dict.items())]
     return trend_list
 
-
+# 按震级区间统计 自定义6个震级分段
 def get_magnitude_data(earthquake_list):
     ranges = [
         ("0-2.9", 0, 2.9),
@@ -211,7 +236,9 @@ def get_magnitude_data(earthquake_list):
 
     magnitude_list = []
     for range_name, min_mag, max_mag in ranges:
+        # 统计地震数量
         count = sum(1 for eq in earthquake_list if min_mag <= eq.magnitude <= max_mag)
+        # 当前区间所有震级，最大值，平均值
         mags = [eq.magnitude for eq in earthquake_list if min_mag <= eq.magnitude <= max_mag]
         max_mag_val = max(mags) if mags else 0
         avg_mag_val = sum(mags) / len(mags) if mags else 0
@@ -225,9 +252,10 @@ def get_magnitude_data(earthquake_list):
 
     return magnitude_list
 
-
+# # 按省份统计并倒序
 def get_province_data(earthquake_list):
     province_dict = {}
+    # 按省份分组统计
     for eq in earthquake_list:
         p = eq.province
         if p:

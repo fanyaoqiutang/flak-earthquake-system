@@ -190,10 +190,21 @@ const currentAlert = ref({
   tip: ''
 })
 
+const allProvinceMap = ref({}) // {省份名称:省份ID}
 onMounted(() => {
   loadUserInfo()
   loadSubscriptions()
-  // 模拟订阅省份地震预警
+  // 获取全量省份名-ID映射
+  fetch('http://127.0.0.1:5000/api/user/provinces', { credentials: 'include' })
+    .then(res => res.json())
+    .then(data => {
+      if(data.code === 200){
+        data.data.forEach(p => {
+          allProvinceMap.value[p.province_name] = p.province_id
+        })
+      }
+    })
+  // 模拟预警
   setTimeout(() => {
     simulateEarthquakeAlert()
   }, 3000)
@@ -251,8 +262,20 @@ const removeSubscription = (province) => {
 }
 
 const saveSubscriptions = () => {
-  ElMessage.success('订阅设置已保存')
-  dialogVisible.value = false
+  // 省份名转id数组
+  const province_ids = subscriptions.value.map(name => allProvinceMap.value[name])
+  fetch('http://127.0.0.1:5000/api/user/subscribe/batch', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ province_ids })
+  }).then(res => res.json()).then(data => {
+    if (data.code === 200) {
+      ElMessage.success('订阅设置已保存')
+      dialogVisible.value = false
+      loadSubscriptions() // 刷新订阅列表
+    }
+  }).catch(err => console.error(err))
 }
 
 // 模拟订阅省份地震预警弹窗

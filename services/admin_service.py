@@ -6,6 +6,7 @@ from sqlalchemy import func,desc
 
 ADMIN_SECRET_KEY = "ADMIN_2025_EARTHQUAKE"
 
+# 管理员身份验证
 def verify_admin():
     if session.get('is_admin'):
         return True
@@ -15,6 +16,7 @@ def verify_admin():
         return True
     return False
 
+# 管理员操作日志（记录增删改操作）
 def add_admin_log(admin_id, operation, target_earthquake_id=None, remark=""):
     log = AdminOperationLog(
         admin_id=admin_id,
@@ -24,6 +26,7 @@ def add_admin_log(admin_id, operation, target_earthquake_id=None, remark=""):
     db.session.add(log)
     db.session.commit()
 
+# 自动生成预警
 def generate_alerts(earthquake_id):
     eq = EarthquakeInfo.query.get(earthquake_id)
     if not eq or eq.magnitude < 4.0:
@@ -39,7 +42,7 @@ def generate_alerts(earthquake_id):
     if cnt>0:
         db.session.commit()
     return cnt>0
-
+# 管理员注册
 def svc_admin_register():
     data = request.get_json(force=True)
     account = data.get('admin_account')
@@ -61,6 +64,7 @@ def svc_admin_register():
     db.session.commit()
     return jsonify({"code": 200, "msg": "注册成功"})
 
+# 管理员登录
 def svc_admin_login():
     data = request.get_json(force=True)
     account = data.get('admin_account')
@@ -77,15 +81,18 @@ def svc_admin_login():
     session['admin_token'] = token
     return jsonify({"code": 200, "msg": "登录成功", "data": {"admin_token": token, "admin_account": admin.admin_account}})
 
+# 管理员登出
 def svc_admin_logout():
     session.clear()
     return jsonify({"code": 200, "msg": "退出成功"})
 
+# 获取当前管理员，用于后台页面展示当前登录人
 def svc_admin_info():
     if not session.get('is_admin'):
         return jsonify({"code": 401, "msg": "未登录"}), 401
     return jsonify({"code": 200, "data": {"admin_id": session.get("admin_id"), "admin_account": session.get("admin_account")}})
 
+# 新增地震信息
 def svc_add_earthquake():
     if not verify_admin():
         return jsonify({"code": 403, "msg": "无权限，请先以管理员身份登录"}), 403
@@ -115,6 +122,7 @@ def svc_add_earthquake():
     generate_alerts(eq.earthquake_id)
     return jsonify({"code": 200, "msg": "添加成功"})
 
+# 修改地震消息
 def svc_update_earthquake():
     if not verify_admin():
         return jsonify({"code": 403, "msg": "无权限，请先以管理员身份登录"}), 403
@@ -175,6 +183,7 @@ def svc_update_earthquake():
     add_admin_log(session.get('admin_id'), "修改地震", eq.earthquake_id)
     return jsonify({"code": 200, "msg": "修改成功"})
 
+# 删除地震消息
 def svc_delete_earthquake():
     if not verify_admin():
         return jsonify({"code": 403, "msg": "无权限，请先以管理员身份登录"}), 403
@@ -189,9 +198,7 @@ def svc_delete_earthquake():
     add_admin_log(session.get('admin_id'), "删除地震", eq.earthquake_id)
     return jsonify({"code": 200, "msg": "删除成功"})
 
-# ==========================
-# 【升级】用户管理（支持搜索、状态、最后活跃）
-# ==========================
+# 用户管理（支持搜索、状态、最后活跃）
 def svc_admin_get_all_users():
     if not verify_admin():
         return jsonify({"code": 403, "msg": "无管理员权限"}), 403
@@ -246,9 +253,7 @@ def svc_admin_get_all_users():
         })
     return jsonify({"code": 200, "data": data})
 
-# ==========================
-# 【新增】用户统计（总用户/活跃/禁用）
-# ==========================
+# 用户统计（总用户/活跃/禁用）
 def svc_admin_get_user_stats():
     if not verify_admin():
         return jsonify({"code":403,"msg":"无权限"}),403
@@ -269,9 +274,7 @@ def svc_admin_get_user_stats():
         }
     })
 
-# ==========================
-# 【新增】切换用户状态（正常/禁用）
-# ==========================
+# 切换用户状态（正常/禁用）
 def svc_admin_toggle_user_status(user_id):
     if not verify_admin():
         return jsonify({"code":403,"msg":"无权限"}),403
@@ -282,6 +285,7 @@ def svc_admin_toggle_user_status(user_id):
     db.session.commit()
     return jsonify({"code":200,"msg":"状态已更新"})
 
+# 删除用户
 def svc_admin_delete_user(user_id):
     if not verify_admin():
         return jsonify({"code": 403, "msg": "无权限"}), 403
@@ -298,9 +302,7 @@ def svc_admin_delete_user(user_id):
     db.session.commit()
     return jsonify({"code": 200, "msg": "用户已删除"})
 
-# ==========================
-# 反馈管理
-# ==========================
+# 获取反馈信息
 def svc_admin_get_all_feedbacks():
     if not verify_admin():
         return jsonify({"code": 403, "msg": "无权限"}), 403
@@ -322,6 +324,7 @@ def svc_admin_get_all_feedbacks():
         })
     return jsonify({"code": 200, "data": res})
 
+# 处理反馈
 def svc_admin_handle_feedback(feedback_id):
     if not verify_admin():
         return jsonify({"code": 403, "msg": "无权限"}), 403
@@ -335,9 +338,7 @@ def svc_admin_handle_feedback(feedback_id):
     db.session.commit()
     return jsonify({"code": 200, "msg": "已处理"})
 
-# ==========================
 # 聊天消息管理
-# ==========================
 def svc_admin_get_all_chat_messages():
     if not verify_admin():
         return jsonify({"code": 403, "msg": "无权限"}), 403
@@ -355,6 +356,7 @@ def svc_admin_get_all_chat_messages():
         })
     return jsonify({"code": 200, "data": res})
 
+# 删除聊天信息
 def svc_admin_delete_chat_msg(msg_id):
     if not verify_admin():
         return jsonify({"code": 403, "msg": "无权限"}), 403
