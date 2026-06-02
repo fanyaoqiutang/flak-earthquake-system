@@ -4,7 +4,7 @@ import request from './request'
 // 获取地震列表
 export function getEarthquakeList(params) {
   return request({
-    url: '/api/earthquake/list',
+    url: '/earthquake/list',
     method: 'get',
     params
   })
@@ -13,7 +13,7 @@ export function getEarthquakeList(params) {
 // 获取所有省份
 export function getProvinces() {
   return request({
-    url: '/api/provinces',
+    url: '/provinces',
     method: 'get'
   })
 }
@@ -21,7 +21,7 @@ export function getProvinces() {
 // 获取省份分组（按地区）
 export function getProvincesGroupByRegion() {
   return request({
-    url: '/api/province/group',
+    url: '/province/group',
     method: 'get'
   })
 }
@@ -29,7 +29,7 @@ export function getProvincesGroupByRegion() {
 // 获取地震统计数据（综合统计）
 export function getEarthquakeStatistics(params) {
   return request({
-    url: '/api/statistics',
+    url: '/statistics',
     method: 'get',
     params
   })
@@ -38,7 +38,7 @@ export function getEarthquakeStatistics(params) {
 // 获取省份地震统计（饼图）
 export function getEarthquakeStatsProvince(params) {
   return request({
-    url: '/api/earthquake/stats/province',
+    url: '/earthquake/stats/province',
     method: 'get',
     params
   })
@@ -47,7 +47,7 @@ export function getEarthquakeStatsProvince(params) {
 // 获取时间趋势统计（折线图）
 export function getEarthquakeStatsTrend(params) {
   return request({
-    url: '/api/earthquake/stats/trend',
+    url: '/earthquake/stats/trend',
     method: 'get',
     params
   })
@@ -56,7 +56,7 @@ export function getEarthquakeStatsTrend(params) {
 // 获取震级分布统计（柱状图）
 export function getEarthquakeStatsMagnitude(params) {
   return request({
-    url: '/api/earthquake/stats/magnitude',
+    url: '/earthquake/stats/magnitude',
     method: 'get',
     params
   })
@@ -65,7 +65,7 @@ export function getEarthquakeStatsMagnitude(params) {
 // 获取地震频次TOP5排名
 export function getEarthquakeRank(params) {
   return request({
-    url: '/api/earthquake/rank',
+    url: '/earthquake/rank',
     method: 'get',
     params
   })

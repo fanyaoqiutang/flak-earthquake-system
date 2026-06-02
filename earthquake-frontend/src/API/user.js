@@ -4,7 +4,7 @@ import request from './request'
 // 用户注册
 export function userRegister(data) {
   return request({
-    url: '/api/user/register',
+    url: '/user/register',
     method: 'post',
     data
   })
@@ -13,7 +13,7 @@ export function userRegister(data) {
 // 用户登录
 export function userLogin(data) {
   return request({
-    url: '/api/user/login',
+    url: '/user/login',
     method: 'post',
     data
   })
@@ -22,7 +22,7 @@ export function userLogin(data) {
 // 用户登出
 export function userLogout() {
   return request({
-    url: '/api/user/logout',
+    url: '/user/logout',
     method: 'post'
   })
 }
@@ -30,7 +30,7 @@ export function userLogout() {
 // 获取用户信息
 export function getUserInfo() {
   return request({
-    url: '/api/user/info',
+    url: '/user/info',
     method: 'get'
   })
 }
@@ -38,7 +38,7 @@ export function getUserInfo() {
 // 订阅省份
 export function subscribeProvince(data) {
   return request({
-    url: '/api/user/subscribe',
+    url: '/user/subscribe',
     method: 'post',
     data
   })
@@ -47,7 +47,7 @@ export function subscribeProvince(data) {
 // 批量订阅省份
 export function subscribeBatch(data) {
   return request({
-    url: '/api/user/subscribe/batch',
+    url: '/user/subscribe/batch',
     method: 'post',
     data
   })
@@ -56,7 +56,7 @@ export function subscribeBatch(data) {
 // 取消订阅
 export function unsubscribeProvince(subscribeId) {
   return request({
-    url: `/api/user/subscribe/${subscribeId}`,
+    url: `/user/subscribe/${subscribeId}`,
     method: 'delete'
   })
 }
@@ -64,7 +64,7 @@ export function unsubscribeProvince(subscribeId) {
 // 获取订阅列表
 export function getSubscriptions() {
   return request({
-    url: '/api/user/subscriptions',
+    url: '/user/subscriptions',
     method: 'get'
   })
 }
@@ -72,7 +72,7 @@ export function getSubscriptions() {
 // 获取我的订阅ID列表
 export function getMySubscribeIds() {
   return request({
-    url: '/api/user/subscribe/my',
+    url: '/user/subscribe/my',
     method: 'get'
   })
 }
@@ -80,7 +80,7 @@ export function getMySubscribeIds() {
 // 获取预警列表
 export function getAlerts() {
   return request({
-    url: '/api/user/alerts',
+    url: '/user/alerts',
     method: 'get'
   })
 }
@@ -88,7 +88,7 @@ export function getAlerts() {
 // 获取预警设置
 export function getAlertSettings() {
   return request({
-    url: '/api/user/alert/settings',
+    url: '/user/alert/settings',
     method: 'get'
   })
 }
@@ -96,7 +96,7 @@ export function getAlertSettings() {
 // 更新预警设置
 export function updateAlertSettings(data) {
   return request({
-    url: '/api/user/alert/settings',
+    url: '/user/alert/settings',
     method: 'post',
     data
   })
@@ -105,7 +105,7 @@ export function updateAlertSettings(data) {
 // 标记预警已读
 export function markAlertRead(alertId) {
   return request({
-    url: `/api/user/alerts/${alertId}/read`,
+    url: `/user/alerts/${alertId}/read`,
     method: 'post'
   })
 }
@@ -113,7 +113,7 @@ export function markAlertRead(alertId) {
 // 全部标记已读
 export function markAllAlertsRead() {
   return request({
-    url: '/api/user/alerts/read-all',
+    url: '/user/alerts/read-all',
     method: 'post'
   })
 }
@@ -121,7 +121,7 @@ export function markAllAlertsRead() {
 // 获取未读预警数量
 export function getUnreadAlertsCount() {
   return request({
-    url: '/api/user/alerts/unread',
+    url: '/user/alerts/unread',
     method: 'get'
   })
 }
@@ -129,7 +129,7 @@ export function getUnreadAlertsCount() {
 // 提交反馈
 export function submitFeedback(data) {
   return request({
-    url: '/api/user/feedback',
+    url: '/user/feedback',
     method: 'post',
     data
   })
@@ -138,7 +138,7 @@ export function submitFeedback(data) {
 // 发送聊天消息
 export function sendChatMessage(data) {
   return request({
-    url: '/api/user/chat',
+    url: '/user/chat',
     method: 'post',
     data
   })
@@ -147,7 +147,7 @@ export function sendChatMessage(data) {
 // 获取聊天记录
 export function getChatList() {
   return request({
-    url: '/api/user/chat/list',
+    url: '/user/chat/list',
     method: 'get'
   })
 }

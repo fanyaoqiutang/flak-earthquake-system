@@ -4,7 +4,7 @@ import request from './request'
 // 管理员注册
 export function adminRegister(data) {
   return request({
-    url: '/api/admin/register',
+    url: '/admin/register',
     method: 'post',
     data
   })
@@ -13,7 +13,7 @@ export function adminRegister(data) {
 // 管理员登录
 export function adminLogin(data) {
   return request({
-    url: '/api/admin/login',
+    url: '/admin/login',
     method: 'post',
     data
   })
@@ -22,7 +22,7 @@ export function adminLogin(data) {
 // 管理员登出
 export function adminLogout() {
   return request({
-    url: '/api/admin/logout',
+    url: '/admin/logout',
     method: 'post'
   })
 }
@@ -30,15 +30,15 @@ export function adminLogout() {
 // 获取当前登录管理员信息
 export function getAdminInfo() {
   return request({
-    url: '/api/admin/info',
-    method: 'get'             // 获取信息用 GET
+    url: '/admin/info',
+    method: 'get'
   })
 }
 
 // 获取用户列表
 export function getUserList() {
   return request({
-    url: '/api/admin/user/list',
+    url: '/admin/user/list',
     method: 'get'
   })
 }
@@ -46,7 +46,7 @@ export function getUserList() {
 // 获取用户统计
 export function getUserStats() {
   return request({
-    url: '/api/admin/user/stats',
+    url: '/admin/user/stats',
     method: 'get'
   })
 }
@@ -54,7 +54,7 @@ export function getUserStats() {
 // 切换用户状态
 export function toggleUserStatus(userId) {
   return request({
-    url: `/api/admin/user/status/${userId}`,
+    url: `/admin/user/status/${userId}`,
     method: 'post'
   })
 }
@@ -62,7 +62,7 @@ export function toggleUserStatus(userId) {
 // 删除用户
 export function deleteUser(userId) {
   return request({
-    url: `/api/admin/user/delete/${userId}`,
+    url: `/admin/user/delete/${userId}`,
     method: 'post'
   })
 }
@@ -70,7 +70,7 @@ export function deleteUser(userId) {
 // 获取反馈列表
 export function getFeedbackList() {
   return request({
-    url: '/api/admin/feedback/list',
+    url: '/admin/feedback/list',
     method: 'get'
   })
 }
@@ -78,7 +78,7 @@ export function getFeedbackList() {
 // 处理反馈
 export function handleFeedback(fbId, data) {
   return request({
-    url: `/api/admin/feedback/handle/${fbId}`,
+    url: `/admin/feedback/handle/${fbId}`,
     method: 'post',
     data
   })
@@ -87,7 +87,7 @@ export function handleFeedback(fbId, data) {
 // 获取聊天消息列表
 export function getChatMessageList() {
   return request({
-    url: '/api/admin/chat/list',
+    url: '/admin/chat/list',
     method: 'get'
   })
 }
@@ -95,7 +95,7 @@ export function getChatMessageList() {
 // 删除聊天消息
 export function deleteChatMessage(msgId) {
   return request({
-    url: `/api/admin/chat/delete/${msgId}`,
+    url: `/admin/chat/delete/${msgId}`,
     method: 'post'
   })
 }
@@ -103,7 +103,7 @@ export function deleteChatMessage(msgId) {
 // 添加地震
 export function addEarthquake(data) {
   return request({
-    url: '/api/admin/earthquake/add',
+    url: '/admin/earthquake/add',
     method: 'post',
     data
   })
@@ -112,7 +112,7 @@ export function addEarthquake(data) {
 // 更新地震
 export function updateEarthquake(data) {
   return request({
-    url: '/api/admin/earthquake/update',
+    url: '/admin/earthquake/update',
     method: 'post',
     data
   })
@@ -121,7 +121,7 @@ export function updateEarthquake(data) {
 // 删除地震
 export function deleteEarthquake(data) {
   return request({
-    url: '/api/admin/earthquake/delete',
+    url: '/admin/earthquake/delete',
     method: 'post',
     data
   })

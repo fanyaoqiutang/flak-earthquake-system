@@ -346,21 +346,17 @@ const loadSubscriptions = async () => {
 
   try {
     const response = await getSubscriptions()
-    console.log('订阅列表响应:', response)
     if (response.code === 200) {
-      subscriptions.value = response.data
-      // 提取已订阅的省份ID，确保是数组
-      selectedProvinceIds.value = Array.isArray(response.data)
-        ? response.data.map(item => item.province_id)
-        : []
-      console.log('已订阅省份ID:', selectedProvinceIds.value)
+      subscriptions.value = Array.isArray(response.data) ? response.data : []
+      selectedProvinceIds.value = subscriptions.value.map(item => item.province_id)
+      console.log('✅ 已订阅省份:', selectedProvinceIds.value)
     }
   } catch (err) {
     console.error('加载订阅失败:', err)
-    // 确保即使失败也是空数组
     selectedProvinceIds.value = []
   }
 }
+
 
 const loadAlertSettings = async () => {
   if (!isLoggedIn.value) return
@@ -369,9 +365,10 @@ const loadAlertSettings = async () => {
     const response = await getAlertSettings()
     if (response.code === 200) {
       const data = response.data
-      settings.value.pushNotify = data.push_notify || true
-      settings.value.soundAlert = data.sound_alert || true
+      settings.value.pushNotify = data.alert_frequency === '实时预警'
+      settings.value.soundAlert = data.alert_methods?.includes('站内信') || true
       settings.value.threshold = String(data.magnitude_threshold || 5)
+      console.log('✅ 预警设置:', data)
     }
   } catch (err) {
     console.error('加载预警设置失败:', err)

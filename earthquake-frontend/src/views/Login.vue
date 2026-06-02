@@ -107,6 +107,8 @@ import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { User, Lock, Key, Setting, ArrowRight, InfoFilled } from '@element-plus/icons-vue'
+import { userLogin as userLoginAPI, userRegister as userRegisterAPI } from '../API/user'
+import { adminLogin as adminLoginAPI, adminRegister as adminRegisterAPI } from '../API/admin'
 
 const router = useRouter()
 const loginType = ref('user')
@@ -117,8 +119,6 @@ const form = reactive({
   password: '',
   adminKey: ''
 })
-
-const API_BASE = 'http://127.0.0.1:5000'
 
 const quickLogin = async (account, password, type) => {
   loginType.value = type
@@ -133,32 +133,39 @@ const handleLogin = async () => {
     return
   }
 
+  if (loginType.value === 'admin' && !form.adminKey) {
+    ElMessage.warning('请输入管理密钥')
+    return
+  }
+
   loading.value = true
 
   try {
-    const endpoint = loginType.value === 'user'
-      ? '/api/user/login'
-      : '/api/admin/login'
+    let response
 
-    const body = loginType.value === 'user'
-  ? { user_account: form.account, password: form.password }
-  : { admin_account: form.account, password: form.password, admin_key: form.adminKey }
+    if (loginType.value === 'user') {
+      response = await userLoginAPI({
+        user_account: form.account,
+        password: form.password
+      })
+    } else {
+      response = await adminLoginAPI({
+        admin_account: form.account,
+        password: form.password,
+        admin_key: form.adminKey
+      })
+    }
 
-    const response = await fetch(`${API_BASE}${endpoint}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      credentials: 'include'
-    })
-
-    const data = await response.json()
-
-    if (data.code === 200) {
+    if (response.code === 200) {
       const tokenKey = loginType.value === 'user' ? 'user_token' : 'admin_token'
       const accountKey = loginType.value === 'user' ? 'user_account' : 'admin_account'
+      const idKey = loginType.value === 'user' ? 'user_id' : 'admin_id'
 
-      localStorage.setItem(tokenKey, data.data[loginType.value === 'user' ? 'user_token' : 'admin_token'])
-      localStorage.setItem(accountKey, data.data[loginType.value === 'user' ? 'user_account' : 'admin_account'])
+      localStorage.setItem(tokenKey, response.data[tokenKey])
+      localStorage.setItem(accountKey, response.data[accountKey])
+      if (response.data[idKey]) {
+        localStorage.setItem(idKey, response.data[idKey])
+      }
       localStorage.setItem('user_role', loginType.value)
 
       ElMessage.success('登录成功')
@@ -166,12 +173,9 @@ const handleLogin = async () => {
       const redirectPath = localStorage.getItem('redirect_path') || '/'
       localStorage.removeItem('redirect_path')
       router.push(redirectPath)
-    } else {
-      ElMessage.error(data.msg || '登录失败')
     }
   } catch (error) {
     console.error('登录错误:', error)
-    ElMessage.error('登录失败,请检查网络连接')
   } finally {
     loading.value = false
   }
@@ -193,40 +197,43 @@ const handleRegister = async () => {
     return
   }
 
+  if (loginType.value === 'admin' && !form.adminKey) {
+    ElMessage.warning('请输入管理密钥')
+    return
+  }
+
   loading.value = true
 
   try {
-    const endpoint = loginType.value === 'user'
-      ? '/api/user/register'
-      : '/api/admin/register'
+    let response
 
-    const body = loginType.value === 'user'
-      ? { user_account: form.account, password: form.password }
-      : { admin_account: form.account, password: form.password, admin_key: form.adminKey }
+    if (loginType.value === 'user') {
+      response = await userRegisterAPI({
+        user_account: form.account,
+        password: form.password
+      })
+    } else {
+      response = await adminRegisterAPI({
+        admin_account: form.account,
+        password: form.password,
+        admin_key: form.adminKey
+      })
+    }
 
-    const response = await fetch(`${API_BASE}${endpoint}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    })
-
-    const data = await response.json()
-
-    if (data.code === 200) {
-      ElMessage.success(data.msg)
+    if (response.code === 200) {
+      ElMessage.success(response.msg)
       form.account = ''
       form.password = ''
-    } else {
-      ElMessage.error(data.msg || '注册失败')
+      form.adminKey = ''
     }
   } catch (error) {
     console.error('注册错误:', error)
-    ElMessage.error('注册失败,请检查网络连接')
   } finally {
     loading.value = false
   }
 }
 </script>
+
 
 <style scoped>
 .login-container {

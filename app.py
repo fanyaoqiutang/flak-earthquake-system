@@ -2,45 +2,27 @@ from flask import Flask,render_template
 from flask_login import LoginManager
 from flask_cors import CORS
 from models import db, User, Admin
+
+app = Flask(__name__)
+CORS(app, supports_credentials=True, origins=['http://localhost:5173', 'http://127.0.0.1:5173'])
+app.secret_key = "earthquake_2025_secure_key_change_in_production"
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = False
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['PERMANENT_SESSION_LIFETIME'] = 86400 * 7
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///test.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
 # 导入蓝图
 from routes.admin_routes import admin_bp
 from routes.user_routes import user_bp
 from routes.common_routes import common_bp
 
-app = Flask(__name__)
-
-# 配置CORS，明确指定允许前端域名
-CORS(app, 
-     supports_credentials=True,
-     resources={
-         r"/api/*": {
-             "origins": ["http://localhost:5173", "http://127.0.0.1:5173",
-                         "http://localhost:5183", "http://127.0.0.1:5183"],
-             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-             "allow_headers": ["Content-Type", "Authorization", "X-Admin-Token"],
-             "expose_headers": ["Set-Cookie"],
-             "max_age": 3600
-         }
-     })
-
-app.secret_key = "earthquake_2025_secure_key_change_in_production"
-
-# Session配置 - 关键修改
-app.config['SESSION_COOKIE_NAME'] = 'earthquake_session'
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # 改为Lax
-app.config['SESSION_COOKIE_SECURE'] = False  # 开发环境必须False
-app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['PERMANENT_SESSION_LIFETIME'] = 3600 * 24  # 24小时
-
-# 通过URL链接数据库
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///test.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
 db.init_app(app)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
-login_manager.session_protection = None  # 禁用session保护
+login_manager.session_protection = "strong"
 login_manager.login_message = "请先登录"
 
 @login_manager.user_loader
@@ -65,7 +47,7 @@ with app.app_context():
     db.create_all()
     from models import Province
     if not Province.query.first():
-        # 给每个省份自动填上【所属大区 region】
+        # 👇 我只改了这里：给每个省份自动填上【所属大区 region】
         provinces = [
             # 华北
             Province(province_name="北京市", region="华北地区"),

@@ -439,7 +439,6 @@ const editEarthquake = (row) => {
 }
 
 const saveEarthquake = async () => {
-  // 表单验证
   if (!earthquakeForm.province_id) {
     ElMessage.warning('请选择省份')
     return
@@ -455,36 +454,40 @@ const saveEarthquake = async () => {
     return
   }
 
-  // 准备提交的数据
+  if (earthquakeForm.depth <= 0) {
+    ElMessage.warning('深度必须大于0')
+    return
+  }
+
   const submitData = {
-    province_id: earthquakeForm.province_id,
-    earthquake_time: new Date(earthquakeForm.earthquake_time).toISOString(),
-    magnitude: earthquakeForm.magnitude,
-    depth: earthquakeForm.depth,
-    latitude: earthquakeForm.latitude,
-    longitude: earthquakeForm.longitude,
+    province_id: parseInt(earthquakeForm.province_id),
+    earthquake_time: new Date(earthquakeForm.earthquake_time).toISOString().replace('T', ' ').substring(0, 19),
+    latitude: parseFloat(earthquakeForm.latitude),
+    longitude: parseFloat(earthquakeForm.longitude),
+    depth: parseFloat(earthquakeForm.depth),
+    magnitude: parseFloat(earthquakeForm.magnitude),
     earthquake_message: earthquakeForm.earthquake_message || ''
   }
 
-  // 如果是编辑，添加ID
   if (isEdit.value) {
     submitData.earthquake_id = earthquakeForm.earthquake_id
   }
 
+  console.log('📤 提交地震数据:', submitData)
+
   try {
     if (isEdit.value) {
       await updateEarthquake(submitData)
+      ElMessage.success('修改成功')
     } else {
       await addEarthquake(submitData)
+      ElMessage.success('添加成功')
     }
-    ElMessage.success('保存成功')
     earthquakeDialogVisible.value = false
     loadEarthquakeData()
   } catch (error) {
     console.error('保存地震数据失败:', error)
-    // 即使报错，也关闭对话框并刷新数据
-    earthquakeDialogVisible.value = false
-    loadEarthquakeData()
+    ElMessage.error(isEdit.value ? '修改失败' : '添加失败')
   }
 }
 
