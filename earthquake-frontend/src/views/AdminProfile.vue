@@ -153,7 +153,7 @@
               <el-table-column label="操作" width="250">
                 <template #default="{ row }">
                   <el-button type="primary" size="small" @click="viewUserDetail(row)">详情</el-button>
-                  <el-button :type="row.status === 'normal' ? 'warning' : 'success'" size="small" @click="toggleUserStatus(row)">
+                  <el-button :type="row.status === 'normal' ? 'warning' : 'success'" size="small" @click="toggleUserStatusLocal(row)">
                     {{ row.status === 'normal' ? '禁用' : '启用' }}
                   </el-button>
                 </template>
@@ -210,7 +210,7 @@
               </el-table-column>
               <el-table-column label="操作" width="200">
                 <template #default="{ row }">
-                  <el-button type="primary" size="small" @click="handleFeedback(row.id)">处理</el-button>
+                  <el-button type="primary" size="small" @click="handleFeedbackLocal(row.id)">处理</el-button>
                   <el-button type="danger" size="small" @click="deleteFeedback(row.id)">删除</el-button>
                 </template>
               </el-table-column>
@@ -265,8 +265,20 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   DataLine, Warning, Location, User, ChatDotRound, Comment, CircleClose
 } from '@element-plus/icons-vue'
-
-const API_BASE = 'http://127.0.0.1:5000'
+import {
+  getUserStats,
+  getUserList,
+  toggleUserStatus,
+  deleteUser,
+  getFeedbackList,
+  handleFeedback,
+  getChatMessageList,
+  deleteChatMessage,
+  addEarthquake,
+  updateEarthquake,
+  deleteEarthquake as deleteEarthquakeAPI
+} from '../API/admin'
+import { getEarthquakeList, getProvinces } from '../API/common'
 
 const activeMenu = ref('dashboard')
 const menuTitle = computed(() => {
@@ -327,18 +339,31 @@ const handleMenuSelect = (index) => {
 }
 
 const loadDashboardStats = async () => {
-  stats.totalUsers = 100
-  stats.todayMessages = 256
-  stats.totalEarthquakes = 50
-  stats.pendingFeedbacks = 5
+  try {
+    const userStats = await getUserStats()
+    if (userStats.code === 200) {
+      stats.totalUsers = userStats.data.total || 0
+    }
+
+    const eqList = await getEarthquakeList()
+    if (eqList.code === 200) {
+      stats.totalEarthquakes = eqList.data.length || 0
+    }
+
+    const fbList = await getFeedbackList()
+    if (fbList.code === 200) {
+      stats.pendingFeedbacks = fbList.data.filter(item => item.status === 'pending').length || 0
+    }
+  } catch (error) {
+    console.error('加载仪表盘数据失败:', error)
+  }
 }
 
 const loadEarthquakeData = async () => {
   try {
-    const response = await fetch(`${API_BASE}/api/earthquake/list`)
-    const data = await response.json()
-    if (data.code === 200) {
-      earthquakeList.value = data.data
+    const response = await getEarthquakeList()
+    if (response.code === 200) {
+      earthquakeList.value = response.data
     }
   } catch (error) {
     console.error('加载地震数据失败:', error)
@@ -347,10 +372,9 @@ const loadEarthquakeData = async () => {
 
 const loadProvinceList = async () => {
   try {
-    const response = await fetch(`${API_BASE}/api/provinces`)
-    const data = await response.json()
-    if (data.code === 200) {
-      provinceList.value = data.data
+    const response = await getProvinces()
+    if (response.code === 200) {
+      provinceList.value = response.data
     }
   } catch (error) {
     console.error('加载省份列表失败:', error)
@@ -358,20 +382,24 @@ const loadProvinceList = async () => {
 }
 
 const loadUserList = async () => {
-  userList.value = [
-    { user_id: 1, user_account: 'testuser', last_active_time: '2026-05-26 10:00:00', status: 'normal' }
-  ]
+  try {
+    const response = await getUserList()
+    if (response.code === 200) {
+      userList.value = response.data
+    }
+  } catch (error) {
+    console.error('加载用户列表失败:', error)
+  }
 }
 
 const loadChatList = async () => {
   try {
-    const response = await fetch(`${API_BASE}/api/user/chat/list`)
-    const data = await response.json()
-    if (data.code === 200) {
-      chatList.value = data.data
-      chatStats.total = data.data.length
-      chatStats.normal = data.data.length
-      chatStats.violation = 0
+    const response = await getChatMessageList()
+    if (response.code === 200) {
+      chatList.value = response.data
+      chatStats.total = response.data.length
+      chatStats.normal = response.data.filter(item => item.status === 'normal').length
+      chatStats.violation = response.data.filter(item => item.status === 'violation').length
     }
   } catch (error) {
     console.error('加载聊天列表失败:', error)
@@ -379,7 +407,14 @@ const loadChatList = async () => {
 }
 
 const loadFeedbackList = async () => {
-  feedbackList.value = []
+  try {
+    const response = await getFeedbackList()
+    if (response.code === 200) {
+      feedbackList.value = response.data
+    }
+  } catch (error) {
+    console.error('加载反馈列表失败:', error)
+  }
 }
 
 const showAddEarthquakeDialog = () => {
@@ -403,20 +438,70 @@ const editEarthquake = (row) => {
   earthquakeDialogVisible.value = true
 }
 
-const saveEarthquake = () => {
-  ElMessage.success('保存成功')
-  earthquakeDialogVisible.value = false
-  loadEarthquakeData()
+const saveEarthquake = async () => {
+  // 表单验证
+  if (!earthquakeForm.province_id) {
+    ElMessage.warning('请选择省份')
+    return
+  }
+
+  if (!earthquakeForm.earthquake_time) {
+    ElMessage.warning('请选择发生时间')
+    return
+  }
+
+  if (earthquakeForm.magnitude <= 0) {
+    ElMessage.warning('震级必须大于0')
+    return
+  }
+
+  // 准备提交的数据
+  const submitData = {
+    province_id: earthquakeForm.province_id,
+    earthquake_time: new Date(earthquakeForm.earthquake_time).toISOString(),
+    magnitude: earthquakeForm.magnitude,
+    depth: earthquakeForm.depth,
+    latitude: earthquakeForm.latitude,
+    longitude: earthquakeForm.longitude,
+    earthquake_message: earthquakeForm.earthquake_message || ''
+  }
+
+  // 如果是编辑，添加ID
+  if (isEdit.value) {
+    submitData.earthquake_id = earthquakeForm.earthquake_id
+  }
+
+  try {
+    if (isEdit.value) {
+      await updateEarthquake(submitData)
+    } else {
+      await addEarthquake(submitData)
+    }
+    ElMessage.success('保存成功')
+    earthquakeDialogVisible.value = false
+    loadEarthquakeData()
+  } catch (error) {
+    console.error('保存地震数据失败:', error)
+    // 即使报错，也关闭对话框并刷新数据
+    earthquakeDialogVisible.value = false
+    loadEarthquakeData()
+  }
 }
 
-const deleteEarthquake = (id) => {
+const deleteEarthquake = async (id) => {
   ElMessageBox.confirm('确定要删除这条地震数据吗？', '提示', {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
     type: 'warning'
-  }).then(() => {
-    ElMessage.success('删除成功')
-    loadEarthquakeData()
+  }).then(async () => {
+    try {
+      await deleteEarthquakeAPI({ earthquake_id: id })
+      ElMessage.success('删除成功')
+      loadEarthquakeData()
+    } catch (error) {
+      console.error('删除地震数据失败:', error)
+      ElMessage.error('删除失败')
+    }
   }).catch(() => {})
 }
 
@@ -443,26 +528,38 @@ const viewUserDetail = (row) => {
   ElMessage.info(`查看用户 ${row.user_account} 详情`)
 }
 
-const toggleUserStatus = (row) => {
+const toggleUserStatusLocal = async (row) => {
   const newStatus = row.status === 'normal' ? '禁用' : '启用'
   ElMessageBox.confirm(`确定要${newStatus}该用户吗？`, '提示', {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
     type: 'warning'
-  }).then(() => {
-    row.status = row.status === 'normal' ? 'disabled' : 'normal'
-    ElMessage.success(`${newStatus}成功`)
+  }).then(async () => {
+    try {
+      await toggleUserStatus(row.user_id)
+      ElMessage.success(`${newStatus}成功`)
+      loadUserList()
+    } catch (error) {
+      console.error('切换用户状态失败:', error)
+      ElMessage.error('操作失败')
+    }
   }).catch(() => {})
 }
 
-const deleteChat = (id) => {
+const deleteChat = async (id) => {
   ElMessageBox.confirm('确定要删除这条消息吗？', '提示', {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
     type: 'warning'
-  }).then(() => {
-    ElMessage.success('删除成功')
-    loadChatList()
+  }).then(async () => {
+    try {
+      await deleteChatMessage(id)
+      ElMessage.success('删除成功')
+      loadChatList()
+    } catch (error) {
+      console.error('删除聊天消息失败:', error)
+      ElMessage.error('删除失败')
+    }
   }).catch(() => {})
 }
 
@@ -487,9 +584,15 @@ const muteUser = (userId) => {
   }).catch(() => {})
 }
 
-const handleFeedback = (id) => {
-  ElMessage.success('反馈已处理')
-  loadFeedbackList()
+const handleFeedbackLocal = async (id) => {
+  try {
+    await handleFeedback(id, { status: 'handled' })
+    ElMessage.success('反馈已处理')
+    loadFeedbackList()
+  } catch (error) {
+    console.error('处理反馈失败:', error)
+    ElMessage.error('处理失败')
+  }
 }
 
 const deleteFeedback = (id) => {

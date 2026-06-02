@@ -45,10 +45,10 @@
           type="textarea"
           :rows="3"
           placeholder="请输入消息..."
-          :disabled="!isLoggedIn"
+          :disabled="!canChat"
         />
         <div class="input-footer">
-          <el-button type="primary" @click="sendMessage" :disabled="!isLoggedIn || !newMessage.trim()">
+          <el-button type="primary" @click="sendMessage" :disabled="!canChat || !newMessage.trim()">
             发送
           </el-button>
         </div>
@@ -58,74 +58,85 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, nextTick, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { sendChatMessage, getChatList } from '../API/user'
 
 const router = useRouter()
 const newMessage = ref('')
 const messageListRef = ref(null)
 
 const isLoggedIn = computed(() => {
-  return !!localStorage.getItem('user_token') || !!localStorage.getItem('admin_token')
+  return !!localStorage.getItem('user_token')
 })
 
 const isAdmin = computed(() => {
   return !!localStorage.getItem('admin_token')
 })
 
+const canChat = computed(() => {
+  return isLoggedIn.value
+})
+
 const currentUser = computed(() => {
   return localStorage.getItem('user_account') || localStorage.getItem('admin_account') || '匿名用户'
 })
 
-const messages = ref([
-  {
-    id: 1,
-    user: '地震小助手',
-    text: '欢迎来到地震科普交流平台！请大家理性发言，分享防震知识。',
-    time: '10:00',
-    isAdmin: true,
-    isSelf: false
-  },
-  {
-    id: 2,
-    user: '热心网友',
-    text: '今天新疆那边又有地震了，大家注意安全！',
-    time: '10:15',
-    isAdmin: false,
-    isSelf: false
-  },
-  {
-    id: 3,
-    user: '科普达人',
-    text: '地震发生时如果在室内，应该立即躲在坚固的家具下面，保护头部。',
-    time: '10:20',
-    isAdmin: false,
-    isSelf: false
-  }
-])
+const messages = ref([])
 
-const sendMessage = () => {
+onMounted(() => {
+  loadChatMessages()
+})
+
+const loadChatMessages = async () => {
+  try {
+    const response = await getChatList()
+    if (response.code === 200) {
+      messages.value = response.data.map(item => ({
+        id: item.id,
+        user: item.username || item.user_account,
+        text: item.content,
+        time: new Date(item.create_time).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+        isAdmin: item.is_admin || false,
+        isSelf: item.user_id === getCurrentUserId()
+      }))
+
+      nextTick(() => {
+        scrollToBottom()
+      })
+    }
+  } catch (error) {
+    console.error('加载聊天记录失败:', error)
+  }
+}
+
+const getCurrentUserId = () => {
+  return localStorage.getItem('user_id') || localStorage.getItem('admin_id')
+}
+
+const sendMessage = async () => {
+  if (!canChat.value) {
+    ElMessage.warning('请先以用户身份登录')
+    return
+  }
+
   if (!newMessage.value.trim()) {
     ElMessage.warning('请输入消息内容')
     return
   }
 
-  messages.value.push({
-    id: Date.now(),
-    user: currentUser.value,
-    text: newMessage.value,
-    time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-    isAdmin: isAdmin.value,
-    isSelf: true
-  })
-
-  ElMessage.success('发送成功')
-  newMessage.value = ''
-
-  nextTick(() => {
-    scrollToBottom()
-  })
+  try {
+    const response = await sendChatMessage({ content: newMessage.value })
+    if (response.code === 200) {
+      ElMessage.success('发送成功')
+      newMessage.value = ''
+      loadChatMessages()
+    }
+  } catch (error) {
+    console.error('发送消息失败:', error)
+    ElMessage.error('发送消息失败')
+  }
 }
 
 const scrollToBottom = () => {

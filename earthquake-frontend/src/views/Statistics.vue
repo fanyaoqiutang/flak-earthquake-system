@@ -145,8 +145,8 @@ import { ref, reactive, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import { DataAnalysis, Search, Refresh, Download } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
+import { getProvinces, getEarthquakeStatistics } from '../API/common'
 
-const API_BASE = 'http://127.0.0.1:5000'
 const loading = ref(false)
 
 const provinces = ref([])
@@ -193,10 +193,9 @@ onBeforeUnmount(() => {
 
 const loadProvinces = async () => {
   try {
-    const response = await fetch(`${API_BASE}/api/provinces`)
-    const data = await response.json()
-    if (data.code === 200) {
-      provinces.value = data.data.map(item => ({
+    const response = await getProvinces()
+    if (response.code === 200) {
+      provinces.value = response.data.map(item => ({
         id: item.province_id,
         province_name: item.province_name
       }))
@@ -275,42 +274,28 @@ const handleQuery = async () => {
       return
     }
 
-    const params = new URLSearchParams()
+    const params = {
+      start_time: timeRange.start_time,
+      end_time: timeRange.end_time,
+      mag_min: filterForm.magMin || 0
+    }
+
     if (filterForm.province) {
-      params.append('province_id', filterForm.province)
-    }
-    params.append('start_time', timeRange.start_time)
-    params.append('end_time', timeRange.end_time)
-    params.append('mag_min', filterForm.magMin || 0)
-
-    const url = `${API_BASE}/api/statistics?${params.toString()}`
-    console.log('请求URL:', url)
-
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    })
-    console.log('响应状态:', response.status)
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
+      params.province_id = filterForm.province
     }
 
-    const data = await response.json()
-    console.log('响应数据:', data)
+    const response = await getEarthquakeStatistics(params)
 
-    if (data.code === 200) {
-      statisticsData.trend = data.data.trend || []
-      statisticsData.magnitude = data.data.magnitude || []
-      statisticsData.province = data.data.province || []
+    if (response.code === 200) {
+      statisticsData.trend = response.data.trend || []
+      statisticsData.magnitude = response.data.magnitude || []
+      statisticsData.province = response.data.province || []
 
       updateSummary()
       renderCharts()
       ElMessage.success('统计数据加载成功')
     } else {
-      ElMessage.error(data.msg || '获取统计数据失败')
+      ElMessage.error(response.msg || '获取统计数据失败')
     }
   } catch (error) {
     console.error('查询失败:', error)
