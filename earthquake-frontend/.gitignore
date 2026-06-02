@@ -22,3 +22,14 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Python 缓存与编译文件
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# 数据库与实例文件
+instance/
+*.db
+*.sqlite

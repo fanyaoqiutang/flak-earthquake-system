@@ -459,9 +459,28 @@ const saveEarthquake = async () => {
     return
   }
 
+  // 格式化时间
+  let formattedTime
+  if (earthquakeForm.earthquake_time instanceof Date) {
+    // 如果是Date对象
+    formattedTime = earthquakeForm.earthquake_time.toISOString().replace('T', ' ').substring(0, 19)
+  } else if (typeof earthquakeForm.earthquake_time === 'string') {
+    // 如果已经是字符串，尝试解析
+    const date = new Date(earthquakeForm.earthquake_time)
+    if (!isNaN(date.getTime())) {
+      formattedTime = date.toISOString().replace('T', ' ').substring(0, 19)
+    } else {
+      ElMessage.warning('时间格式不正确')
+      return
+    }
+  } else {
+    ElMessage.warning('时间格式不正确')
+    return
+  }
+
   const submitData = {
     province_id: parseInt(earthquakeForm.province_id),
-    earthquake_time: new Date(earthquakeForm.earthquake_time).toISOString().replace('T', ' ').substring(0, 19),
+    earthquake_time: formattedTime,
     latitude: parseFloat(earthquakeForm.latitude),
     longitude: parseFloat(earthquakeForm.longitude),
     depth: parseFloat(earthquakeForm.depth),
@@ -474,6 +493,7 @@ const saveEarthquake = async () => {
   }
 
   console.log('📤 提交地震数据:', submitData)
+  console.log('📅 格式化后的时间:', formattedTime)
 
   try {
     if (isEdit.value) {
@@ -487,7 +507,12 @@ const saveEarthquake = async () => {
     loadEarthquakeData()
   } catch (error) {
     console.error('保存地震数据失败:', error)
-    ElMessage.error(isEdit.value ? '修改失败' : '添加失败')
+    // 显示详细错误信息
+    if (error.response && error.response.data && error.response.data.msg) {
+      ElMessage.error(`保存失败: ${error.response.data.msg}`)
+    } else {
+      ElMessage.error(isEdit.value ? '修改失败' : '添加失败')
+    }
   }
 }
 

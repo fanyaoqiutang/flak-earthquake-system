@@ -41,7 +41,7 @@ def svc_user_login():
     db.session.commit()
 
     # 使用Flask-Login登录
-    login_user(u, remember=True)  # 添加remember=True
+    login_user(u, remember=True)
     
     # 设置session
     session['user_id'] = u.user_id
@@ -49,28 +49,66 @@ def svc_user_login():
     token = secrets.token_hex(32)
     session['user_token'] = token
     
+    # 清除可能的管理员session
+    if 'admin_id' in session:
+        del session['admin_id']
+    if 'admin_account' in session:
+        del session['admin_account']
+    if 'admin_token' in session:
+        del session['admin_token']
+    
     # 确保session被保存
     session.modified = True
-    session.permanent = True  # 设置为永久session
+    session.permanent = True
     
-    print(f"✅ 用户 {account} 登录成功, session ID: {session.sid if hasattr(session, 'sid') else 'N/A'}")
+    print(f"✅ 普通用户 {account} (ID: {u.user_id}) 登录成功")
     
     return jsonify({"code": 200, "msg": "登录成功",
                     "data": {"user_id": u.user_id, "user_account": u.user_account, "user_token": token}})
 
 
 def svc_user_logout():
+    # 只清除用户相关的session
+    keys_to_remove = ['user_id', 'user_account', 'user_token']
+    for key in keys_to_remove:
+        if key in session:
+            del session[key]
+    session.modified = True
+    
+    # 退出Flask-Login
     logout_user()
-    session.clear()
+    
+    print("✅ 普通用户退出登录")
     return jsonify({"code": 200, "msg": "退出成功"})
 
 
 def svc_user_info():
-    return jsonify({"code": 200, "data": {"user_id": current_user.user_id, "user_account": current_user.user_account}})
+    # 支持管理员和普通用户
+    if current_user.is_authenticated:
+        return jsonify({"code": 200, "data": {"user_id": current_user.user_id, "user_account": current_user.user_account}})
+    else:
+        # 尝试从session获取
+        user_id = session.get('user_id')
+        user_account = session.get('user_account')
+        if user_id and user_account:
+            return jsonify({"code": 200, "data": {"user_id": user_id, "user_account": user_account}})
+        
+        # 尝试获取管理员
+        admin_id = session.get('admin_id')
+        admin_account = session.get('admin_account')
+        if admin_id and admin_account:
+            return jsonify({"code": 200, "data": {"user_id": -admin_id, "user_account": admin_account, "role": "admin"}})
+        
+        return jsonify({"code": 401, "msg": "请先登录"}), 401
 
 
-# ====================== 订阅 ======================
+# ====================== 单省份订阅（保留兼容） ======================
 def svc_subscribe_province():
+    # 获取用户ID（支持管理员）
+    user_id = _get_current_user_id()
+    if not user_id:
+        return jsonify({"code": 401, "msg": "请先登录"}), 401
+    
     data = request.get_json(force=True)
     province_id = data.get('province_id')
 
@@ -88,7 +126,6 @@ def svc_subscribe_province():
     if not Province.query.get(province_id):
         return jsonify({"code": 400, "msg": "省份不存在"}), 400
 
-    user_id = current_user.user_id
     existing = UserSubscribeProvince.query.filter_by(user_id=user_id, province_id=province_id).first()
     if existing:
         return jsonify({"code": 400, "msg": "已订阅该省份"}), 400
@@ -98,86 +135,120 @@ def svc_subscribe_province():
     db.session.commit()
     return jsonify({"code": 200, "msg": "订阅成功"})
 
-# 取消订阅
+
 def svc_unsubscribe_province(subscribe_id):
+    # 获取用户ID（支持管理员）
+    user_id = _get_current_user_id()
+    if not user_id:
+        return jsonify({"code": 401, "msg": "请先登录"}), 401
+    
     sub = UserSubscribeProvince.query.get(subscribe_id)
-    if not sub or sub.user_id != current_user.user_id:
+    if not sub or sub.user_id != user_id:
         return jsonify({"code": 403, "msg": "无权限"}), 403
     db.session.delete(sub)
     db.session.commit()
     return jsonify({"code": 200, "msg": "取消订阅成功"})
 
-# 获取当前登录用户的省份订阅列表
+
 def svc_get_subscriptions():
-    # 尝试获取用户ID
-    user_id = None
-    if current_user.is_authenticated:
-        user_id = current_user.user_id
-    else:
-        user_id = session.get('user_id')
-        if not user_id:
-            test_user = User.query.filter_by(user_account='testuser').first()
-            if test_user:
-                user_id = test_user.user_id
+    # 获取用户ID（支持管理员）
+    user_id = _get_current_user_id()
     
     if not user_id:
         return jsonify({"code": 401, "msg": "请先登录"}), 401
     
+    print(f"📋 查询订阅 - 用户ID: {user_id}")
     subs = UserSubscribeProvince.query.filter_by(user_id=user_id).all()
     res = []
     for s in subs:
         p = Province.query.get(s.province_id)
         res.append({"id": s.id, "province_id": s.province_id, "province_name": p.province_name if p else "未知"})
+    print(f" 订阅数量: {len(res)}")
     return jsonify({"code": 200, "data": res})
 
-# ====================== 批量订阅 ======================
-def svc_user_batch_subscribe():
-    # 临时方案：尝试从session获取用户ID，如果失败则使用默认测试用户
-    user_id = None
+
+# ====================== 辅助函数：获取当前用户ID ======================
+def _get_current_user_id():
+    """获取当前用户ID，支持普通用户和管理员"""
+    # 打印当前session内容（调试用）
+    print(f"🔍 当前session内容: {dict(session)}")
     
-    # 尝试从session获取
+    # 尝试从Flask-Login获取（优先）
     if current_user.is_authenticated:
-        user_id = current_user.user_id
-    else:
-        # 如果未认证，尝试从session中获取
-        user_id = session.get('user_id')
-        
-        # 如果还是没有，使用测试用户ID（临时方案）
-        if not user_id:
-            test_user = User.query.filter_by(user_account='testuser').first()
-            if test_user:
-                user_id = test_user.user_id
-                print(f"⚠️ 使用测试用户ID: {user_id}")
-            else:
-                return jsonify({"code": 401, "msg": "请先登录"}), 401
+        print(f"✅ 从Flask-Login获取用户ID: {current_user.user_id}")
+        return current_user.user_id
+    
+    # 尝试从session获取普通用户ID
+    user_id = session.get('user_id')
+    user_account = session.get('user_account')
+    if user_id:
+        print(f"✅ 从session获取普通用户ID: {user_id}, 账号: {user_account}")
+        return user_id
+    
+    # 尝试从session获取管理员ID
+    admin_id = session.get('admin_id')
+    admin_account = session.get('admin_account')
+    if admin_id:
+        print(f"✅ 从session获取管理员ID: {admin_id}, 账号: {admin_account}")
+        return -admin_id  # 管理员使用负数ID
+    
+    # 没有登录，返回None
+    print("⚠️ 用户未登录")
+    return None
+
+
+# ====================== 【新增】批量订阅（支持多选大区） ======================
+def svc_user_batch_subscribe():
+    # 获取用户ID（支持管理员）
+    user_id = _get_current_user_id()
+    
+    if not user_id:
+        return jsonify({"code": 401, "msg": "请先登录"}), 401
     
     province_ids = request.get_json().get("province_ids", [])
     print(f"✅ 批量订阅 - 用户ID: {user_id}, 省份IDs: {province_ids}")
 
     # 清空原有订阅
-    UserSubscribeProvince.query.filter_by(user_id=user_id).delete()
+    deleted_count = UserSubscribeProvince.query.filter_by(user_id=user_id).delete()
+    print(f"🗑️ 删除旧订阅: {deleted_count} 条")
 
     # 批量添加
+    added_count = 0
     for pid in province_ids:
         if Province.query.get(pid):
             db.session.add(UserSubscribeProvince(user_id=user_id, province_id=pid))
+            added_count += 1
 
     db.session.commit()
-    print(f"✅ 批量订阅成功")
+    print(f"✅ 批量订阅成功 - 新增: {added_count} 条")
     return jsonify({"code": 200, "msg": "订阅已更新"})
 
 
-# ====================== 获取订阅ID列表 ======================
 def svc_user_my_subscribe_ids():
-    subs = UserSubscribeProvince.query.filter_by(user_id=current_user.user_id).all()
+    # 获取用户ID（支持管理员）
+    user_id = _get_current_user_id()
+    
+    if not user_id:
+        return jsonify({"code": 401, "msg": "请先登录"}), 401
+    
+    subs = UserSubscribeProvince.query.filter_by(user_id=user_id).all()
     pids = [s.province_id for s in subs]
     return jsonify({"code": 200, "data": pids})
 
 
 # ====================== 预警 ======================
-# 预警
 def svc_get_user_alerts():
-    alerts = UserEarthquakeAlert.query.filter_by(user_id=current_user.user_id).order_by(
+    # 获取用户ID（支持管理员）
+    user_id = _get_current_user_id()
+    
+    if not user_id:
+        return jsonify({"code": 401, "msg": "请先登录"}), 401
+    
+    # 管理员没有预警
+    if user_id < 0:
+        return jsonify({"code": 200, "data": []})
+    
+    alerts = UserEarthquakeAlert.query.filter_by(user_id=user_id).order_by(
         UserEarthquakeAlert.id.desc()).all()
     res = []
     for a in alerts:
@@ -196,13 +267,29 @@ def svc_get_user_alerts():
 
 
 def svc_get_unread_alerts_count():
-    cnt = UserEarthquakeAlert.query.filter_by(user_id=current_user.user_id, is_read=False).count()
+    # 获取用户ID（支持管理员）
+    user_id = _get_current_user_id()
+    
+    if not user_id:
+        return jsonify({"code": 401, "msg": "请先登录"}), 401
+    
+    # 管理员没有预警
+    if user_id < 0:
+        return jsonify({"code": 200, "data": {"unread_count": 0}})
+    
+    cnt = UserEarthquakeAlert.query.filter_by(user_id=user_id, is_read=False).count()
     return jsonify({"code": 200, "data": {"unread_count": cnt}})
 
 
 def svc_mark_alert_read(alert_id):
+    # 获取用户ID（支持管理员）
+    user_id = _get_current_user_id()
+    
+    if not user_id:
+        return jsonify({"code": 401, "msg": "请先登录"}), 401
+    
     a = UserEarthquakeAlert.query.get(alert_id)
-    if not a or a.user_id != current_user.user_id:
+    if not a or a.user_id != user_id:
         return jsonify({"code": 403, "msg": "无权限"}), 403
     a.is_read = True
     db.session.commit()
@@ -210,28 +297,36 @@ def svc_mark_alert_read(alert_id):
 
 
 def svc_mark_all_alerts_read():
-    alerts = UserEarthquakeAlert.query.filter_by(user_id=current_user.user_id, is_read=False).all()
+    # 获取用户ID（支持管理员）
+    user_id = _get_current_user_id()
+    
+    if not user_id:
+        return jsonify({"code": 401, "msg": "请先登录"}), 401
+    
+    alerts = UserEarthquakeAlert.query.filter_by(user_id=user_id, is_read=False).all()
     for a in alerts:
         a.is_read = True
     db.session.commit()
     return jsonify({"code": 200, "msg": "全部已读"})
 
 
-# ====================== 预警设置======================
+# ====================== 【新增】预警设置（频率 + 通知方式） ======================
 def svc_user_get_alert_settings():
-    # 尝试获取用户ID
-    user_id = None
-    if current_user.is_authenticated:
-        user_id = current_user.user_id
-    else:
-        user_id = session.get('user_id')
-        if not user_id:
-            test_user = User.query.filter_by(user_account='testuser').first()
-            if test_user:
-                user_id = test_user.user_id
+    # 获取用户ID（支持管理员）
+    user_id = _get_current_user_id()
     
     if not user_id:
         return jsonify({"code": 401, "msg": "请先登录"}), 401
+    
+    # 管理员没有这些设置，返回默认值
+    if user_id < 0:
+        return jsonify({
+            "code": 200,
+            "data": {
+                "alert_frequency": "实时预警",
+                "alert_methods": ["站内信"]
+            }
+        })
     
     user = User.query.get(user_id)
     if not user:
@@ -247,8 +342,20 @@ def svc_user_get_alert_settings():
 
 
 def svc_user_update_alert_settings():
+    # 获取用户ID（支持管理员）
+    user_id = _get_current_user_id()
+    
+    if not user_id:
+        return jsonify({"code": 401, "msg": "请先登录"}), 401
+    
+    # 管理员不更新这些设置
+    if user_id < 0:
+        return jsonify({"code": 200, "msg": "管理员无需设置"})
+    
     data = request.get_json()
-    u = current_user
+    u = User.query.get(user_id)
+    if not u:
+        return jsonify({"code": 404, "msg": "用户不存在"}), 404
 
     freq = data.get("alert_frequency")
     methods = data.get("alert_methods", [])
