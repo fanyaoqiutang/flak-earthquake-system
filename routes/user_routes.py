@@ -99,12 +99,28 @@ def user_feedback():
                 user_id = -admin_id  # 管理员使用负数ID
     return svc_submit_feedback(user_id, data)
 
+
 # ====================== 公共聊天室：发送消息（必须登录） ======================
 @user_bp.route("/chat", methods=["POST"])
 @login_required
 def send_chat():
     data = request.get_json()
     return svc_send_chat_message(current_user.user_id, data)
+
+
+# ====================== 管理员发送聊天消息 ======================
+@user_bp.route("/chat/admin", methods=["POST"])
+def admin_send_chat():
+    from services.admin_service import verify_admin
+
+    if not verify_admin():
+        return jsonify({"code": 403, "msg": "无权限，请先以管理员身份登录"}), 403
+
+    data = request.get_json()
+    # 管理员使用负数ID
+    admin_id = session.get('admin_id', -1)
+    return svc_send_chat_message(-admin_id, data)
+
 
 # ====================== 公共聊天室：获取所有历史消息 ======================
 @user_bp.route("/chat/list", methods=["GET"])
@@ -116,3 +132,23 @@ def chat_list():
 @user_bp.route("/provinces", methods=["GET"])
 def get_all_province():
     return svc_get_all_provinces()
+
+# 更新用户基础信息
+@user_bp.route("/info/update", methods=["PUT"])
+@login_required
+def update_user_info_route():
+    data = request.get_json()
+    return svc_update_user_info(current_user.user_id, data)
+
+# 修改密码
+@user_bp.route("/password/change", methods=["POST"])
+@login_required
+def change_password_route():
+    data = request.get_json()
+    return svc_change_password(current_user.user_id, data)
+
+# 注销账号
+@user_bp.route("/account/delete", methods=["DELETE"])
+@login_required
+def delete_account_route():
+    return svc_delete_account(current_user.user_id)

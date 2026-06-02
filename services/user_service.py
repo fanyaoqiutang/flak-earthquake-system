@@ -405,11 +405,19 @@ def svc_send_chat_message(user_id, data):
             content=f"[管理员] {content}"
         )
     else:
+        # 检查用户状态，禁用的用户不允许发送消息
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({"code": 404, "msg": "用户不存在"}), 404
+
+        if user.status == "禁用":
+            return jsonify({"code": 403, "msg": "您的账号已被禁用，无法发送消息"}), 403
+
         msg = ChatMessage(
             user_id=user_id,
             content=content
         )
-    
+
     db.session.add(msg)
     db.session.commit()
 
@@ -430,10 +438,68 @@ def svc_get_chat_list():
             username = user.user_account if user else "未知用户"
 
         res.append({
+            "id": m.id,
             "user_id": m.user_id,
             "username": username,
             "content": m.content,
-            "create_time": m.create_time.strftime("%Y-%m-%d %H:%M:%S")
+            "create_time": m.create_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "status": m.status if hasattr(m, 'status') else 'normal'
         })
 
     return jsonify({"code": 200, "data": res})
+
+
+# ... existing code ...
+
+def svc_update_user_info(user_id, data):
+    """更新用户基础信息"""
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"code": 404, "msg": "用户不存在"}), 404
+
+    # 更新字段
+    if "nickname" in data:
+        user.user_nickname = data["nickname"]
+    if "phone" in data:
+        user.phone = data["phone"]
+    if "email" in data:
+        user.email = data["email"]
+
+    db.session.commit()
+    return jsonify({"code": 200, "msg": "更新成功"})
+
+
+def svc_change_password(user_id, data):
+    """修改密码"""
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"code": 404, "msg": "用户不存在"}), 404
+
+    old_password = data.get("old_password", "")
+    new_password = data.get("new_password", "")
+
+    if not old_password or not new_password:
+        return jsonify({"code": 400, "msg": "旧密码和新密码不能为空"}), 400
+
+    # 验证旧密码
+    if not user.check_password(old_password):
+        return jsonify({"code": 401, "msg": "旧密码错误"}), 401
+
+    # 更新密码
+    user.set_password(new_password)
+    db.session.commit()
+
+    return jsonify({"code": 200, "msg": "密码修改成功"})
+
+
+def svc_delete_account(user_id):
+    """注销账号（软删除）"""
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"code": 404, "msg": "用户不存在"}), 404
+
+    # 软删除：将状态设置为已注销
+    user.status = "已注销"
+    db.session.commit()
+
+    return jsonify({"code": 200, "msg": "账号已注销"})
