@@ -138,28 +138,28 @@
             </el-table>
           </div>
 
-          <div v-show="activeMenu === 'users'" class="content-section">
-            <el-table :data="userList" style="width: 100%; margin-top: 20px;">
-              <el-table-column prop="user_id" label="ID" width="80" />
-              <el-table-column prop="user_account" label="用户名" />
-              <el-table-column prop="last_active_time" label="最后登录时间" width="180" />
-              <el-table-column label="状态" width="100">
-                <template #default="{ row }">
-                  <el-tag :type="row.status === 'normal' ? 'success' : 'danger'">
-                    {{ row.status === 'normal' ? '正常' : '禁用' }}
-                  </el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column label="操作" width="250">
-                <template #default="{ row }">
-                  <el-button type="primary" size="small" @click="viewUserDetail(row)">详情</el-button>
-                  <el-button :type="row.status === 'normal' ? 'warning' : 'success'" size="small" @click="toggleUserStatusLocal(row)">
-                    {{ row.status === 'normal' ? '禁用' : '启用' }}
-                  </el-button>
-                </template>
-              </el-table-column>
-            </el-table>
-          </div>
+         <div v-show="activeMenu === 'users'" class="content-section">
+          <el-table :data="userList" style="width: 100%; margin-top: 20px;">
+            <el-table-column prop="user_id" label="ID" width="80" />
+            <el-table-column prop="user_account" label="用户名" />
+            <el-table-column prop="last_active_time" label="最后登录时间" width="180" />
+            <el-table-column label="状态" width="100">
+              <template #default="{ row }">
+                <el-tag :type="row.status === '正常' ? 'success' : 'danger'">
+                  {{ row.status }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="250">
+              <template #default="{ row }">
+                <el-button type="primary" size="small" @click="viewUserDetail(row)">详情</el-button>
+                <el-button :type="row.status === '正常' ? 'warning' : 'success'" size="small" @click="toggleUserStatusLocal(row)">
+                  {{ row.status === '正常' ? '禁用' : '启用' }}
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
 
           <div v-show="activeMenu === 'chat'" class="content-section">
             <el-row :gutter="20" style="margin-bottom: 20px;">
@@ -532,7 +532,7 @@ const viewUserDetail = (row) => {
 }
 
 const toggleUserStatusLocal = async (row) => {
-  const newStatus = row.status === 'normal' ? '禁用' : '启用'
+  const newStatus = row.status === '正常' ? '禁用' : '启用'
   ElMessageBox.confirm(`确定要${newStatus}该用户吗？`, '提示', {
     confirmButtonText: '确定',
     cancelButtonText: '取消',

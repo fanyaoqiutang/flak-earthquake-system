@@ -323,10 +323,12 @@ def svc_get_chat_list():
             username = user.user_account if user else "未知用户"
 
         res.append({
+            "id": m.id,
             "user_id": m.user_id,
             "username": username,
             "content": m.content,
-            "create_time": m.create_time.strftime("%Y-%m-%d %H:%M:%S")
+            "create_time": m.create_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "status": m.status if hasattr(m, 'status') else 'normal'
         })
 
     return jsonify({"code": 200, "data": res})

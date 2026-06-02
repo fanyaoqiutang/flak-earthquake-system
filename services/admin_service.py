@@ -424,7 +424,7 @@ def svc_admin_get_all_chat_messages():
     for m in ms:
         u = User.query.get(m.user_id)
         res.append({
-            "msg_id": m.id,
+            "id": m.id,
             "user_id": m.user_id,
             "user_account": u.user_account if u else "已注销",
             "content": m.content,
