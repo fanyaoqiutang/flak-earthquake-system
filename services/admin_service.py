@@ -85,17 +85,28 @@ def svc_admin_login():
     data = request.get_json(force=True)
     account = data.get('admin_account')
     pwd = data.get('password')
+    admin_key = data.get('admin_key')
+
     if not account or not pwd:
         return jsonify({"code": 400, "msg": "参数不能为空"}), 400
+
+    # 验证管理员密钥
+    if not admin_key or admin_key != ADMIN_SECRET_KEY:
+        return jsonify({"code": 403, "msg": "管理员密钥错误，请输入正确的密钥"}), 403
+
     admin = Admin.query.filter_by(admin_account=account).first()
     if not admin or not check_password_hash(admin.password, pwd):
         return jsonify({"code": 401, "msg": "账号或密码错误"}), 401
+
     session['is_admin'] = True
     session['admin_id'] = admin.admin_id
     session['admin_account'] = admin.admin_account
     token = secrets.token_hex(32)
     session['admin_token'] = token
-    return jsonify({"code": 200, "msg": "登录成功", "data": {"admin_token": token, "admin_account": admin.admin_account}})
+
+    return jsonify(
+        {"code": 200, "msg": "登录成功", "data": {"admin_token": token, "admin_account": admin.admin_account}})
+
 
 # 管理员登出
 def svc_admin_logout():
@@ -388,6 +399,7 @@ def svc_admin_get_all_feedbacks():
     for f in fs:
         u = User.query.get(f.user_id)
         res.append({
+            "id": f.id,
             "feedback_id": f.id,
             "user_id": f.user_id,
             "user_account": u.user_account if u else "已注销",
@@ -399,6 +411,7 @@ def svc_admin_get_all_feedbacks():
             "handle_time": f.handle_time.strftime("%Y-%m-%d %H:%M:%S") if f.handle_time else None
         })
     return jsonify({"code": 200, "data": res})
+
 
 # 处理反馈
 def svc_admin_handle_feedback(feedback_id):
@@ -426,11 +439,14 @@ def svc_admin_get_all_chat_messages():
         res.append({
             "id": m.id,
             "user_id": m.user_id,
+            "username": u.user_account if u else "已注销",
             "user_account": u.user_account if u else "已注销",
             "content": m.content,
-            "create_time": m.create_time.strftime("%Y-%m-%d %H:%M:%S")
+            "create_time": m.create_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "status": m.status if hasattr(m, 'status') else 'normal'
         })
     return jsonify({"code": 200, "data": res})
+
 
 # 删除聊天信息
 def svc_admin_delete_chat_msg(msg_id):

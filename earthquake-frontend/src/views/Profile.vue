@@ -20,10 +20,6 @@
               <el-icon><ChatDotRound /></el-icon>
               <span>消息中心</span>
             </el-menu-item>
-            <el-menu-item index="history">
-              <el-icon><Document /></el-icon>
-              <span>历史消息</span>
-            </el-menu-item>
           </el-menu>
         </el-card>
       </el-col>
@@ -73,19 +69,19 @@
           <div v-show="activeMenu === 'security'" class="content-section">
             <el-form :model="securityForm" label-width="120px">
               <el-form-item label="当前密码">
-                <el-input v-model="securityForm.oldPassword" type="password" show-password />
+                <el-input v-model="securityForm.oldPassword" type="password" show-password placeholder="请输入当前密码" />
               </el-form-item>
 
               <el-form-item label="新密码">
-                <el-input v-model="securityForm.newPassword" type="password" show-password />
+                <el-input v-model="securityForm.newPassword" type="password" show-password placeholder="请输入新密码（至少6位）" />
               </el-form-item>
 
               <el-form-item label="确认密码">
-                <el-input v-model="securityForm.confirmPassword" type="password" show-password />
+                <el-input v-model="securityForm.confirmPassword" type="password" show-password placeholder="请再次输入新密码" />
               </el-form-item>
 
               <el-form-item>
-                <el-button type="primary" @click="changePassword">修改密码</el-button>
+                <el-button type="primary" @click="handleChangePassword">修改密码</el-button>
                 <el-button type="danger" @click="showDeleteConfirm">注销账号</el-button>
               </el-form-item>
             </el-form>
@@ -163,20 +159,6 @@
               </el-table-column>
             </el-table>
           </div>
-
-          <div v-show="activeMenu === 'history'" class="content-section">
-            <el-table :data="chatHistory" style="width: 100%">
-              <el-table-column prop="content" label="消息内容" />
-              <el-table-column prop="create_time" label="发送时间" width="180" />
-              <el-table-column label="操作" width="100">
-                <template #default="{ row }">
-                  <el-button type="danger" size="small" @click="deleteChatMessage(row.id)">
-                    删除
-                  </el-button>
-                </template>
-              </el-table-column>
-            </el-table>
-          </div>
         </el-card>
       </el-col>
     </el-row>
@@ -187,15 +169,17 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { User, Lock, Bell, ChatDotRound, Document } from '@element-plus/icons-vue'
+import { User, Lock, Bell, ChatDotRound } from '@element-plus/icons-vue'
 import {
   getUserInfo,
+  updateUserInfo,
+  changePassword as apiChangePassword,
+  deleteAccount,
   getSubscriptions,
   unsubscribeProvince,
   getAlerts,
   markAlertRead,
   markAllAlertsRead,
-  getChatList,
   getAlertSettings,
   updateAlertSettings
 } from '../API/user'
@@ -208,8 +192,7 @@ const menuTitle = computed(() => {
     basic: '基础信息',
     security: '账号安全',
     subscription: '订阅管理',
-    messages: '消息中心',
-    history: '历史消息'
+    messages: '消息中心'
   }
   return titles[activeMenu.value]
 })
@@ -229,7 +212,6 @@ const securityForm = reactive({
 
 const subscriptions = ref([])
 const messages = ref([])
-const chatHistory = ref([])
 const alertSettings = reactive({
   frequency: '实时预警',
   methods: ['站内信'],
@@ -241,7 +223,6 @@ onMounted(() => {
   loadUserInfo()
   loadSubscriptions()
   loadMessages()
-  loadChatHistory()
   loadAlertSettings()
 })
 
@@ -284,17 +265,6 @@ const loadMessages = async () => {
   }
 }
 
-const loadChatHistory = async () => {
-  try {
-    const response = await getChatList()
-    if (response.code === 200) {
-      chatHistory.value = response.data
-    }
-  } catch (error) {
-    console.error('加载聊天记录失败:', error)
-  }
-}
-
 const loadAlertSettings = async () => {
   try {
     const response = await getAlertSettings()
@@ -310,8 +280,26 @@ const loadAlertSettings = async () => {
   }
 }
 
-const saveBasicInfo = () => {
-  ElMessage.success('基础信息保存成功')
+const saveBasicInfo = async () => {
+  try {
+    const response = await updateUserInfo({
+      nickname: basicForm.nickname,
+      phone: basicForm.phone,
+      email: basicForm.email
+    })
+    if (response.code === 200) {
+      ElMessage.success('基础信息保存成功')
+      // 更新localStorage中的用户名
+      if (basicForm.nickname) {
+        localStorage.setItem('user_account', basicForm.nickname)
+      }
+    } else {
+      ElMessage.error(response.msg || '保存失败')
+    }
+  } catch (error) {
+    console.error('保存基础信息失败:', error)
+    ElMessage.error('保存失败')
+  }
 }
 
 const handleAvatarChange = (file) => {
@@ -322,15 +310,40 @@ const handleAvatarChange = (file) => {
   reader.readAsDataURL(file.raw)
 }
 
-const changePassword = () => {
+const handleChangePassword = async () => {
   if (securityForm.newPassword !== securityForm.confirmPassword) {
     ElMessage.error('两次密码输入不一致')
     return
   }
-  ElMessage.success('密码修改成功')
-  securityForm.oldPassword = ''
-  securityForm.newPassword = ''
-  securityForm.confirmPassword = ''
+
+  if (!securityForm.oldPassword) {
+    ElMessage.error('请输入当前密码')
+    return
+  }
+
+  if (securityForm.newPassword.length < 6) {
+    ElMessage.error('新密码长度不能少于6位')
+    return
+  }
+
+  try {
+    const response = await apiChangePassword({
+      old_password: securityForm.oldPassword,
+      new_password: securityForm.newPassword
+    })
+
+    if (response.code === 200) {
+      ElMessage.success('密码修改成功')
+      securityForm.oldPassword = ''
+      securityForm.newPassword = ''
+      securityForm.confirmPassword = ''
+    } else {
+      ElMessage.error(response.msg || '密码修改失败')
+    }
+  } catch (error) {
+    console.error('修改密码失败:', error)
+    ElMessage.error(error.response?.data?.msg || '密码修改失败')
+  }
 }
 
 const showDeleteConfirm = () => {
@@ -338,10 +351,20 @@ const showDeleteConfirm = () => {
     confirmButtonText: '确定注销',
     cancelButtonText: '取消',
     type: 'warning'
-  }).then(() => {
-    ElMessage.success('账号已注销')
-    localStorage.clear()
-    router.push('/login')
+  }).then(async () => {
+    try {
+      const response = await deleteAccount()
+      if (response.code === 200) {
+        ElMessage.success('账号已注销')
+        localStorage.clear()
+        router.push('/login')
+      } else {
+        ElMessage.error(response.msg || '注销失败')
+      }
+    } catch (error) {
+      console.error('注销账号失败:', error)
+      ElMessage.error('注销失败')
+    }
   }).catch(() => {})
 }
 
@@ -396,15 +419,45 @@ const markAllRead = async () => {
     console.error('标记失败:', error)
   }
 }
-
-const deleteChatMessage = async (id) => {
-  ElMessageBox.confirm('确定要删除这条消息吗？', '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning'
-  }).then(async () => {
-    ElMessage.success('删除成功')
-    loadChatHistory()
-  }).catch(() => {})
-}
 </script>
+
+<style scoped>
+.profile-container {
+  padding: 20px;
+}
+
+.menu-card {
+  position: sticky;
+  top: 20px;
+}
+
+.content-card {
+  min-height: 500px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-header h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.content-section {
+  padding: 10px 0;
+}
+
+.message-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.avatar-uploader {
+  display: inline-block;
+}
+</style>

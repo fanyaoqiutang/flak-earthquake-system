@@ -151,3 +151,32 @@ export function getChatList() {
     method: 'get'
   })
 }
+
+
+// 更新用户基础信息
+export function updateUserInfo(data) {
+  return request({
+    url: '/user/info/update',
+    method: 'put',
+    data
+  })
+}
+
+// 修改密码
+export function changePassword(data) {
+  return request({
+    url: '/user/password/change',
+    method: 'post',
+    data
+  })
+}
+
+// 注销账号
+export function deleteAccount() {
+  return request({
+    url: '/user/account/delete',
+    method: 'delete'
+  })
+}
+
+

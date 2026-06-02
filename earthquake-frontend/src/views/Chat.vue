@@ -57,8 +57,7 @@
   </div>
 </template>
 
-<script setup>
-import { ref, computed, nextTick, onMounted } from 'vue'
+<script setup>import { ref, computed, nextTick, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { sendChatMessage, getChatList } from '../API/user'
@@ -71,16 +70,12 @@ const isLoggedIn = computed(() => {
   return !!localStorage.getItem('user_token')
 })
 
-const isAdmin = computed(() => {
-  return !!localStorage.getItem('admin_token')
-})
-
 const canChat = computed(() => {
   return isLoggedIn.value
 })
 
 const currentUser = computed(() => {
-  return localStorage.getItem('user_account') || localStorage.getItem('admin_account') || '匿名用户'
+  return localStorage.getItem('user_account') || '匿名用户'
 })
 
 const messages = ref([])
@@ -112,7 +107,7 @@ const loadChatMessages = async () => {
 }
 
 const getCurrentUserId = () => {
-  return localStorage.getItem('user_id') || localStorage.getItem('admin_id')
+  return localStorage.getItem('user_id')
 }
 
 const sendMessage = async () => {

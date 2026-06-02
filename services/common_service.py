@@ -48,11 +48,11 @@ def svc_list_earthquake():
     for eq in lst:
         p = eq.province
         res.append({
-            "id": eq.earthquake_id,
-            "location": p.province_name if p else "未知",
-            "time": eq.earthquake_time.strftime("%Y-%m-%d %H:%M:%S"),
-            "lat": eq.latitude,
-            "lng": eq.longitude,
+            "earthquake_id": eq.earthquake_id,
+            "province_name": p.province_name if p else "未知",
+            "earthquake_time": eq.earthquake_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "latitude": eq.latitude,
+            "longitude": eq.longitude,
             "depth": eq.depth,
             "magnitude": eq.magnitude
         })
