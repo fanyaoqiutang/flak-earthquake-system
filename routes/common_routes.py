@@ -1,6 +1,7 @@
 from flask import Blueprint, request
 from services.common_service import *
 from services.common_service import svc_get_provinces_group_by_region
+from services.common_service import svc_ai_chat
 common_bp = Blueprint("common", __name__, url_prefix="/api")
 
 # ======================
@@ -41,6 +42,13 @@ def earthquake_rank():
 @common_bp.route("/province/group", methods=["GET"])
 def get_provinces_group_by_region():
     return svc_get_provinces_group_by_region()
+
+# ======================
+# AI 智能问答接口
+# ======================
+@common_bp.route("/ai/chat", methods=["POST"])
+def ai_chat():
+    return svc_ai_chat()
 
 # ======================
 # 数据统计接口

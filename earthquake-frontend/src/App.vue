@@ -74,6 +74,8 @@
     <el-main class="app-main">
       <router-view />
     </el-main>
+    <!-- AI 智能问答悬浮球 -->
+    <AiFloatBall />
   </div>
 </template>
 
@@ -84,6 +86,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   HomeFilled, DataAnalysis, Reading, ChatDotRound, Location, Bell, User, ArrowDown, SwitchButton
 } from '@element-plus/icons-vue'
+import AiFloatBall from '@/components/AiFloatBall.vue'
 
 const router = useRouter()
 const route = useRoute()
