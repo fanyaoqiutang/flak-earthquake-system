@@ -15,21 +15,11 @@ dist-ssr
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
-
-# Python 缓存与编译文件
-__pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-
-# 数据库与实例文件
-instance/
-*.db
-*.sqlite
+*.iml

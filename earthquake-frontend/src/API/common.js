@@ -70,3 +70,12 @@ export function getEarthquakeRank(params) {
     params
   })
 }
+
+// AI 智能问答
+export function aiChat(data) {
+  return request({
+    url: '/ai/chat',
+    method: 'post',
+    data
+  })
+}

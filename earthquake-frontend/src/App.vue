@@ -74,6 +74,8 @@
     <el-main class="app-main">
       <router-view />
     </el-main>
+    <!-- AI 智能问答悬浮球 -->
+    <AiFloatBall />
   </div>
 </template>
 
@@ -84,6 +86,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   HomeFilled, DataAnalysis, Reading, ChatDotRound, Location, Bell, User, ArrowDown, SwitchButton
 } from '@element-plus/icons-vue'
+import AiFloatBall from '@/components/AiFloatBall.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -95,10 +98,36 @@ const activeIndex = computed(() => {
 
 const currentUser = ref('')
 const userRole = ref('')
+// 新增响应式登录标识
+const loginState = ref(false)
 
+// 登录状态改用ref，自动响应变化
 const isLoggedIn = computed(() => {
-  return localStorage.getItem('user_token') || localStorage.getItem('admin_token')
+  return loginState.value
 })
+
+// 封装刷新登录信息方法
+const loadUserInfo = () => {
+  const userToken = localStorage.getItem('user_token')
+  const adminToken = localStorage.getItem('admin_token')
+  const userAccount = localStorage.getItem('user_account')
+  const adminAccount = localStorage.getItem('admin_account')
+
+  // 更新登录状态
+  loginState.value = !!(userToken || adminToken)
+
+  if (userAccount) {
+    currentUser.value = userAccount
+    userRole.value = 'user'
+  } else if (adminAccount) {
+    currentUser.value = adminAccount
+    userRole.value = 'admin'
+  } else {
+    // 没数据清空
+    currentUser.value = ''
+    userRole.value = ''
+  }
+}
 
 onMounted(() => {
   loadUserInfo()
@@ -108,19 +137,6 @@ onMounted(() => {
 watch(() => route.path, () => {
   loadUserInfo()
 })
-
-const loadUserInfo = () => {
-  const userAccount = localStorage.getItem('user_account')
-  const adminAccount = localStorage.getItem('admin_account')
-
-  if (userAccount) {
-    currentUser.value = userAccount
-    userRole.value = 'user'
-  } else if (adminAccount) {
-    currentUser.value = adminAccount
-    userRole.value = 'admin'
-  }
-}
 
 const goToLogin = () => {
   router.push('/login')
@@ -143,6 +159,7 @@ const handleLogout = () => {
   localStorage.clear()
   ElMessage.success('退出登录成功')
   router.push('/login')
+  loadUserInfo() // 执行刷新状态
 }
 
 const handleCommand = (command) => {
@@ -161,14 +178,14 @@ const handleCommand = (command) => {
       userRole.value = ''
       ElMessage.success('已退出登录')
       router.push('/')
+      loadUserInfo() // 关键：重新刷新登录状态
     }).catch(() => {})
   }
 }
 </script>
-
 <style scoped>
 .app-container {
-  min-height: 100vh;
+  min-height: 10 0vh;
   background: #f0f2f5;
 }
 

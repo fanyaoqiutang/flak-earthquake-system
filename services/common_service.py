@@ -1,7 +1,10 @@
+import requests
 from flask import request, jsonify
 from models import EarthquakeInfo, Province, db
 from sqlalchemy import func, and_
 from datetime import datetime,timedelta
+import os
+import requests as http_requests
 
 # 地震列表信息按条件筛查
 # 地震列表信息按条件筛查
@@ -294,3 +297,119 @@ def get_province_data(earthquake_list):
     province_list.sort(key=lambda x: x["count"], reverse=True)
 
     return province_list
+
+
+# AI 智能问答服务
+
+# ===================== 配置你的 DeepSeek Key =====================
+DEEPSEEK_API_KEY = "sk-a30b3e2503c14fda9fd0a915d3de05f6"
+# ================================================================
+
+DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
+
+def svc_ai_chat():
+    try:
+        data = request.get_json()
+        messages = data.get("messages", [])
+        model = data.get("model", "deepseek-chat")
+
+        if not messages:
+            return jsonify({"code": 400, "msg": "消息列表不能为空"}), 400
+
+        # 系统提示：限定AI只回答地震科普
+        system_prompt = {
+            "role": "system",
+            "content": "你是地震预警科普助手，只能回答地震、防灾、避险、自救相关内容，无关问题请礼貌拒绝回答。"
+        }
+
+        headers = {
+            "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+            "Content-Type": "application/json"
+        }
+
+        body = {
+            "model": model,
+            "messages": [system_prompt] + messages
+        }
+
+        print("=" * 50)
+        print(f"正在调用 DeepSeek API...")
+        print(f"URL: {DEEPSEEK_URL}")
+        print(f"模型: {model}")
+        print(f"消息数量: {len(body['messages'])}")
+        print("=" * 50)
+
+        response = http_requests.post(
+            DEEPSEEK_URL,
+            headers=headers,
+            json=body,
+            timeout=40
+        )
+
+        print(f"DeepSeek 响应状态码: {response.status_code}")
+        
+        # 打印完整响应以便调试
+        if response.status_code != 200:
+            print(f"❌ DeepSeek 错误响应: {response.text}")
+        else:
+            print(f"✅ DeepSeek 成功响应")
+
+        if response.status_code != 200:
+            try:
+                error_detail = response.json()
+                error_msg = error_detail.get('error', {}).get('message', '未知错误')
+                error_code = error_detail.get('error', {}).get('type', 'unknown')
+                print(f"DeepSeek API 错误详情: code={error_code}, message={error_msg}")
+            except:
+                error_msg = response.text
+                print(f"DeepSeek API 错误（无法解析JSON）: {error_msg}")
+            
+            return jsonify({
+                "code": 500, 
+                "msg": f"AI服务调用失败: {error_msg}",
+                "data": {}
+            }), 500
+
+        res_json = response.json()
+        
+        if not res_json.get("choices") or len(res_json["choices"]) == 0:
+            print(f"DeepSeek 返回格式异常: {res_json}")
+            return jsonify({
+                "code": 500,
+                "msg": "AI回复格式异常",
+                "data": {}
+            }), 500
+
+        content = res_json["choices"][0]["message"]["content"]
+
+        print(f"✅ AI 回复成功，内容长度: {len(content)} 字符")
+        print("=" * 50)
+
+        return jsonify({
+            "code": 200,
+            "data": {"content": content}
+        })
+
+    except http_requests.exceptions.Timeout:
+        print("❌ AI 请求超时")
+        return jsonify({
+            "code": 504,
+            "msg": "AI服务响应超时，请稍后重试",
+            "data": {}
+        }), 504
+    except http_requests.exceptions.ConnectionError as e:
+        print(f"❌ AI 连接错误: {str(e)}")
+        return jsonify({
+            "code": 503,
+            "msg": "无法连接到AI服务",
+            "data": {}
+        }), 503
+    except Exception as e:
+        print(f"❌ AI异常：{str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "code": 500,
+            "msg": f"AI服务异常: {str(e)}",
+            "data": {}
+        }), 500
