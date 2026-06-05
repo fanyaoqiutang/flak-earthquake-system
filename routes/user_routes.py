@@ -112,20 +112,58 @@ def send_chat():
 @user_bp.route("/chat/admin", methods=["POST"])
 def admin_send_chat():
     from services.admin_service import verify_admin
-
+    
+    print("=" * 50)
+    print("[DEBUG] 管理员发送聊天消息请求")
+    print(f"[DEBUG] Request headers: {dict(request.headers)}")
+    print(f"[DEBUG] Request content-type: {request.content_type}")
+    
+    # 验证管理员身份
     if not verify_admin():
+        print("[ERROR] 管理员验证失败")
         return jsonify({"code": 403, "msg": "无权限，请先以管理员身份登录"}), 403
-
-    data = request.get_json()
+    
+    print("[DEBUG] 管理员验证成功")
+    
+    # 获取请求数据
+    data = request.get_json(force=True, silent=True)
+    print(f"[DEBUG] 接收到的数据: {data}")
+    
+    if not data:
+        print("[ERROR] 请求数据为空或格式错误")
+        return jsonify({"code": 400, "msg": "请求数据格式错误"}), 400
+    
     # 管理员使用负数ID
     admin_id = session.get('admin_id', -1)
-    return svc_send_chat_message(-admin_id, data)
+    print(f"[DEBUG] 管理员ID: {admin_id}")
+    
+    try:
+        result = svc_send_chat_message(-admin_id, data)
+        print(f"[DEBUG] 发送结果: {result}")
+        print("=" * 50)
+        return result
+    except Exception as e:
+        print(f"[ERROR] 发送消息异常: {e}")
+        import traceback
+        traceback.print_exc()
+        print("=" * 50)
+        return jsonify({"code": 500, "msg": f"服务器错误: {str(e)}"}), 500
 
 
 # ====================== 公共聊天室：获取所有历史消息 ======================
 @user_bp.route("/chat/list", methods=["GET"])
-@login_required
 def chat_list():
+    # 允许管理员和普通用户都查看聊天记录
+    from services.admin_service import verify_admin
+    
+    # 如果是管理员，直接返回
+    if verify_admin():
+        return svc_get_chat_list()
+    
+    # 否则需要用户登录
+    if not current_user.is_authenticated:
+        return jsonify({"code": 401, "msg": "请先登录"}), 401
+    
     return svc_get_chat_list()
 
 # 获取全部省份列表

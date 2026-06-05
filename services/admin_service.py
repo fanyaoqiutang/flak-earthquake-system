@@ -6,6 +6,7 @@ from sqlalchemy import func,desc
 
 ADMIN_SECRET_KEY = "ADMIN_2025_EARTHQUAKE"
 
+# 管理员身份验证
 def verify_admin():
     # 优先检查session
     if session.get('is_admin'):
@@ -31,6 +32,7 @@ def verify_admin():
     
     return False
 
+# 管理员操作日志（记录增删改操作）
 def add_admin_log(admin_id, operation, target_earthquake_id=None, remark=""):
     log = AdminOperationLog(
         admin_id=admin_id,
@@ -40,6 +42,7 @@ def add_admin_log(admin_id, operation, target_earthquake_id=None, remark=""):
     db.session.add(log)
     db.session.commit()
 
+# 自动生成预警
 def generate_alerts(earthquake_id):
     eq = EarthquakeInfo.query.get(earthquake_id)
     if not eq or eq.magnitude < 4.0:
@@ -55,7 +58,7 @@ def generate_alerts(earthquake_id):
     if cnt>0:
         db.session.commit()
     return cnt>0
-
+# 管理员注册
 def svc_admin_register():
     data = request.get_json(force=True)
     account = data.get('admin_account')
@@ -77,55 +80,46 @@ def svc_admin_register():
     db.session.commit()
     return jsonify({"code": 200, "msg": "注册成功"})
 
+# 管理员登录
 def svc_admin_login():
     data = request.get_json(force=True)
     account = data.get('admin_account')
     pwd = data.get('password')
+    admin_key = data.get('admin_key')
+
     if not account or not pwd:
         return jsonify({"code": 400, "msg": "参数不能为空"}), 400
+
+    # 验证管理员密钥
+    if not admin_key or admin_key != ADMIN_SECRET_KEY:
+        return jsonify({"code": 403, "msg": "管理员密钥错误，请输入正确的密钥"}), 403
+
     admin = Admin.query.filter_by(admin_account=account).first()
     if not admin or not check_password_hash(admin.password, pwd):
         return jsonify({"code": 401, "msg": "账号或密码错误"}), 401
-    
-    # 设置管理员session
+
     session['is_admin'] = True
     session['admin_id'] = admin.admin_id
     session['admin_account'] = admin.admin_account
     token = secrets.token_hex(32)
     session['admin_token'] = token
-    
-    # 清除可能的普通用户session
-    if 'user_id' in session:
-        del session['user_id']
-    if 'user_account' in session:
-        del session['user_account']
-    if 'user_token' in session:
-        del session['user_token']
-    
-    # 确保session被保存
-    session.modified = True
-    session.permanent = True
-    
-    print(f"✅ 管理员 {account} (ID: {admin.admin_id}) 登录成功")
-    
-    return jsonify({"code": 200, "msg": "登录成功", "data": {"admin_token": token, "admin_account": admin.admin_account}})
+
+    return jsonify(
+        {"code": 200, "msg": "登录成功", "data": {"admin_token": token, "admin_account": admin.admin_account}})
 
 
+# 管理员登出
 def svc_admin_logout():
-    # 只清除管理员相关的session
-    keys_to_remove = ['is_admin', 'admin_id', 'admin_account', 'admin_token']
-    for key in keys_to_remove:
-        if key in session:
-            del session[key]
-    session.modified = True
-    print("✅ 管理员退出登录")
+    session.clear()
     return jsonify({"code": 200, "msg": "退出成功"})
 
+# 获取当前管理员，用于后台页面展示当前登录人
 def svc_admin_info():
     if not session.get('is_admin'):
         return jsonify({"code": 401, "msg": "未登录"}), 401
     return jsonify({"code": 200, "data": {"admin_id": session.get("admin_id"), "admin_account": session.get("admin_account")}})
 
+# 新增地震信息
 def svc_add_earthquake():
     try:
         if not verify_admin():
@@ -151,40 +145,13 @@ def svc_add_earthquake():
         if not Province.query.get(province_id):
             return jsonify({"code": 400, "msg": "省份不存在"}), 400
         
-        # 修复时间解析逻辑
         try:
-            earthquake_time_str = data['earthquake_time']
-            print(f"[DEBUG] 原始时间字符串: {earthquake_time_str}")
-            
-            # 尝试多种时间格式
-            t = None
-            formats = [
-                '%Y-%m-%dT%H:%M:%S',  # ISO格式带T
-                '%Y-%m-%d %H:%M:%S',   # 标准格式
-                '%Y-%m-%dT%H:%M:%S.%f',  # ISO格式带毫秒
-                '%Y-%m-%d %H:%M:%S.%f',  # 标准格式带毫秒
-            ]
-            
-            for fmt in formats:
-                try:
-                    t = datetime.datetime.strptime(earthquake_time_str, fmt)
-                    print(f"[DEBUG] 使用格式 {fmt} 解析成功: {t}")
-                    break
-                except ValueError:
-                    continue
-            
-            # 如果上述格式都失败，尝试fromisoformat
-            if t is None:
-                # 移除时区信息
-                clean_time = earthquake_time_str.replace('Z', '').replace('+00:00', '')
-                t = datetime.datetime.fromisoformat(clean_time)
-                print(f"[DEBUG] 使用fromisoformat解析成功: {t}")
-                
+            try:
+                t = datetime.datetime.fromisoformat(data['earthquake_time'])
+            except:
+                t = datetime.datetime.strptime(data['earthquake_time'], '%Y-%m-%d %H:%M:%S')
         except Exception as e:
-            print(f"[ERROR] 时间解析失败: {e}")
-            import traceback
-            traceback.print_exc()
-            return jsonify({"code": 400, "msg": f"时间格式错误: {str(e)}，请使用格式如 '2026-05-25 10:30:00'"}), 400
+            return jsonify({"code": 400, "msg": f"时间格式错误: {str(e)}"}), 400
         
         eq = EarthquakeInfo(
             province_id=province_id, 
@@ -227,6 +194,7 @@ def svc_add_earthquake():
         traceback.print_exc()
         return jsonify({"code": 500, "msg": f"服务器错误: {str(e)}"}), 500
 
+# 修改地震消息
 def svc_update_earthquake():
     try:
         if not verify_admin():
@@ -302,6 +270,7 @@ def svc_update_earthquake():
         traceback.print_exc()
         return jsonify({"code": 500, "msg": f"服务器错误: {str(e)}"}), 500
 
+# 删除地震消息
 def svc_delete_earthquake():
     if not verify_admin():
         return jsonify({"code": 403, "msg": "无权限，请先以管理员身份登录"}), 403
@@ -316,9 +285,7 @@ def svc_delete_earthquake():
     add_admin_log(session.get('admin_id'), "删除地震", eq.earthquake_id)
     return jsonify({"code": 200, "msg": "删除成功"})
 
-# ==========================
-# 【升级】用户管理（支持搜索、状态、最后活跃）
-# ==========================
+# 用户管理（支持搜索、状态、最后活跃）
 def svc_admin_get_all_users():
     if not verify_admin():
         return jsonify({"code": 403, "msg": "无管理员权限"}), 403
@@ -373,9 +340,7 @@ def svc_admin_get_all_users():
         })
     return jsonify({"code": 200, "data": data})
 
-# ==========================
-# 【新增】用户统计（总用户/活跃/禁用）
-# ==========================
+# 用户统计（总用户/活跃/禁用）
 def svc_admin_get_user_stats():
     if not verify_admin():
         return jsonify({"code":403,"msg":"无权限"}),403
@@ -396,9 +361,7 @@ def svc_admin_get_user_stats():
         }
     })
 
-# ==========================
-# 【新增】切换用户状态（正常/禁用）
-# ==========================
+# 切换用户状态（正常/禁用）
 def svc_admin_toggle_user_status(user_id):
     if not verify_admin():
         return jsonify({"code":403,"msg":"无权限"}),403
@@ -409,6 +372,7 @@ def svc_admin_toggle_user_status(user_id):
     db.session.commit()
     return jsonify({"code":200,"msg":"状态已更新"})
 
+# 删除用户
 def svc_admin_delete_user(user_id):
     if not verify_admin():
         return jsonify({"code": 403, "msg": "无权限"}), 403
@@ -425,9 +389,7 @@ def svc_admin_delete_user(user_id):
     db.session.commit()
     return jsonify({"code": 200, "msg": "用户已删除"})
 
-# ==========================
-# 反馈管理
-# ==========================
+# 获取反馈信息
 def svc_admin_get_all_feedbacks():
     if not verify_admin():
         return jsonify({"code": 403, "msg": "无权限"}), 403
@@ -437,6 +399,7 @@ def svc_admin_get_all_feedbacks():
     for f in fs:
         u = User.query.get(f.user_id)
         res.append({
+            "id": f.id,
             "feedback_id": f.id,
             "user_id": f.user_id,
             "user_account": u.user_account if u else "已注销",
@@ -449,6 +412,8 @@ def svc_admin_get_all_feedbacks():
         })
     return jsonify({"code": 200, "data": res})
 
+
+# 处理反馈
 def svc_admin_handle_feedback(feedback_id):
     if not verify_admin():
         return jsonify({"code": 403, "msg": "无权限"}), 403
@@ -462,9 +427,7 @@ def svc_admin_handle_feedback(feedback_id):
     db.session.commit()
     return jsonify({"code": 200, "msg": "已处理"})
 
-# ==========================
 # 聊天消息管理
-# ==========================
 def svc_admin_get_all_chat_messages():
     if not verify_admin():
         return jsonify({"code": 403, "msg": "无权限"}), 403
@@ -472,16 +435,26 @@ def svc_admin_get_all_chat_messages():
     ms = ChatMessage.query.order_by(desc(ChatMessage.create_time)).all()
     res = []
     for m in ms:
-        u = User.query.get(m.user_id)
+        # 检查是否为管理员消息（user_id 为 None）
+        if m.user_id is None:
+            username = "管理员"
+        else:
+            u = User.query.get(m.user_id)
+            username = u.user_account if u else "已注销"
+        
         res.append({
-            "msg_id": m.id,
+            "id": m.id,
             "user_id": m.user_id,
-            "user_account": u.user_account if u else "已注销",
+            "username": username,
+            "user_account": username,
             "content": m.content,
-            "create_time": m.create_time.strftime("%Y-%m-%d %H:%M:%S")
+            "create_time": m.create_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "status": m.status if hasattr(m, 'status') else 'normal'
         })
     return jsonify({"code": 200, "data": res})
 
+
+# 删除聊天信息
 def svc_admin_delete_chat_msg(msg_id):
     if not verify_admin():
         return jsonify({"code": 403, "msg": "无权限"}), 403
