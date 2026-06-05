@@ -435,12 +435,18 @@ def svc_admin_get_all_chat_messages():
     ms = ChatMessage.query.order_by(desc(ChatMessage.create_time)).all()
     res = []
     for m in ms:
-        u = User.query.get(m.user_id)
+        # 检查是否为管理员消息（user_id 为 None）
+        if m.user_id is None:
+            username = "管理员"
+        else:
+            u = User.query.get(m.user_id)
+            username = u.user_account if u else "已注销"
+        
         res.append({
             "id": m.id,
             "user_id": m.user_id,
-            "username": u.user_account if u else "已注销",
-            "user_account": u.user_account if u else "已注销",
+            "username": username,
+            "user_account": username,
             "content": m.content,
             "create_time": m.create_time.strftime("%Y-%m-%d %H:%M:%S"),
             "status": m.status if hasattr(m, 'status') else 'normal'

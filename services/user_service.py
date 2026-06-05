@@ -286,24 +286,34 @@ def svc_submit_feedback(user_id, data):
 
 # ====================== 发送聊天消息 ======================
 def svc_send_chat_message(user_id, data):
+    print(f"[DEBUG] svc_send_chat_message 被调用")
+    print(f"[DEBUG] user_id: {user_id}")
+    print(f"[DEBUG] data: {data}")
+    
     content = data.get("content", "").strip()
+    print(f"[DEBUG] content: '{content}'")
 
     if not content:
+        print("[ERROR] 消息内容为空")
         return jsonify({"code": 400, "msg": "消息不能为空"}), 400
 
     # 如果是管理员（负数ID），不关联到User表
     if user_id < 0:
+        print(f"[DEBUG] 管理员消息，user_id={user_id}")
         msg = ChatMessage(
             user_id=None,  # 管理员消息不关联用户
             content=f"[管理员] {content}"
         )
     else:
         # 检查用户状态，禁用的用户不允许发送消息
+        print(f"[DEBUG] 普通用户消息，user_id={user_id}")
         user = User.query.get(user_id)
         if not user:
+            print(f"[ERROR] 用户不存在: user_id={user_id}")
             return jsonify({"code": 404, "msg": "用户不存在"}), 404
 
         if user.status == "禁用":
+            print(f"[ERROR] 用户已被禁用: user_id={user_id}")
             return jsonify({"code": 403, "msg": "您的账号已被禁用，无法发送消息"}), 403
 
         msg = ChatMessage(
@@ -311,10 +321,18 @@ def svc_send_chat_message(user_id, data):
             content=content
         )
 
-    db.session.add(msg)
-    db.session.commit()
-
-    return jsonify({"code": 200, "msg": "发送成功"})
+    try:
+        print(f"[DEBUG] 准备保存消息到数据库")
+        db.session.add(msg)
+        db.session.commit()
+        print(f"[DEBUG] 消息保存成功, ID: {msg.id}")
+        return jsonify({"code": 200, "msg": "发送成功"})
+    except Exception as e:
+        print(f"[ERROR] 数据库操作失败: {e}")
+        db.session.rollback()
+        import traceback
+        traceback.print_exc()
+        return jsonify({"code": 500, "msg": f"数据库错误: {str(e)}"}), 500
 
 
 # ====================== 获取聊天记录 ======================
@@ -341,8 +359,6 @@ def svc_get_chat_list():
 
     return jsonify({"code": 200, "data": res})
 
-
-# ... existing code ...
 
 def svc_update_user_info(user_id, data):
     """更新用户基础信息"""
