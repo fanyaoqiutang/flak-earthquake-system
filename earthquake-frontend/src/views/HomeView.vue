@@ -23,6 +23,38 @@
     <!-- 筛选栏 -->
     <div class="filter-bar">
       <div class="filter-group">
+        <span class="filter-label">地区</span>
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <el-select
+            v-model="selectedProvinceId"
+            placeholder="选择省份"
+            clearable
+            @change="handleProvinceChange"
+            style="width: 150px"
+          >
+            <el-option
+              v-for="province in provinces"
+              :key="province.province_id"
+              :label="province.province_name"
+              :value="province.province_id"
+            />
+          </el-select>
+          <el-select
+            v-model="selectedCityId"
+            placeholder="选择城市"
+            clearable
+            style="width: 150px"
+          >
+            <el-option
+              v-for="city in cities"
+              :key="city.city_id"
+              :label="city.city_name"
+              :value="city.city_id"
+            />
+          </el-select>
+        </div>
+      </div>
+      <div class="filter-group">
         <span class="filter-label">时间</span>
         <div class="filter-btns">
           <button @click="timeFilter = '24h'" :class="{ active: timeFilter === '24h' }">24小时</button>
@@ -46,7 +78,7 @@
     <div class="two-columns">
       <!-- 左侧：地图 -->
       <div class="left-col">
-        <div class="section-title">📍 地震分布地图</div>
+        <div class="section-title"> 地震分布地图</div>
         <div id="mapContainer" class="map-box" ref="mapContainer"></div>
       </div>
 
@@ -57,7 +89,7 @@
           <div class="simple-quake-list">
             <div v-for="item in filteredEarthquakes.slice(0, 5)" :key="item.id" class="simple-quake-item">
               <div class="simple-location">
-                <span class="loc-name">{{ item.location }}</span>
+                <span class="loc-name">{{ item.province }} {{ item.city }}</span>
                 <span :class="['simple-mag', getMagClass(item.magnitude)]">M{{ item.magnitude }}</span>
               </div>
               <div class="simple-time">{{ item.time }}</div>
@@ -73,11 +105,17 @@
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
-import { getEarthquakeList } from '../API/common'
+import { getEarthquakeList, getProvinces, getCities } from '../API/common'
 
 const timeFilter = ref('1y')
 const magFilter = ref('0')
 const mapContainer = ref(null)
+
+// 省市筛选
+const selectedProvinceId = ref(null)
+const selectedCityId = ref(null)
+const provinces = ref([])
+const cities = ref([])
 
 let map = null
 let markers = []
@@ -99,7 +137,7 @@ const filteredEarthquakes = computed(() => {
   const threshold = new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
 
   return earthquakeData.value.filter(item => {
-    const itemTime = new Date(item.earthquake_time || item.time)
+    const itemTime = new Date(item.time)
     const timeMatch = itemTime >= threshold
 
     let magMatch = true
@@ -119,16 +157,61 @@ const getMagClass = (mag) => {
 const resetFilter = () => {
   timeFilter.value = '1y'
   magFilter.value = '0'
+  selectedProvinceId.value = null
+  selectedCityId.value = null
+  cities.value = []
+  loadEarthquakeData()
 }
+
+// 省份变化时加载城市列表
+const handleProvinceChange = async (provinceId) => {
+  selectedCityId.value = null
+  cities.value = []
+
+  if (!provinceId) {
+    loadEarthquakeData()
+    return
+  }
+
+  try {
+    const response = await getCities({ province_id: provinceId })
+    if (response.code === 200) {
+      cities.value = response.data
+    }
+  } catch (error) {
+    console.error('加载城市列表失败:', error)
+  }
+
+  loadEarthquakeData()
+}
+
+// 监听城市变化
+watch(selectedCityId, () => {
+  loadEarthquakeData()
+})
 
 // API数据到前端格式的转换
 const loadEarthquakeData = async () => {
   try {
-    const response = await getEarthquakeList()
+    const params = {
+      time: timeFilter.value,
+      mag_min: magFilter.value === '0' ? 0 : parseFloat(magFilter.value)
+    }
+
+    if (selectedProvinceId.value) {
+      params.province_id = selectedProvinceId.value
+    }
+
+    if (selectedCityId.value) {
+      params.city_id = selectedCityId.value
+    }
+
+    const response = await getEarthquakeList(params)
     if (response.code === 200) {
       earthquakeData.value = response.data.map(item => ({
         id: item.earthquake_id,
-        location: item.province_name || item.location,
+        province: item.province_name || '',
+        city: item.city_name || '',
         magnitude: item.magnitude,
         depth: item.depth,
         time: item.earthquake_time,
@@ -138,6 +221,18 @@ const loadEarthquakeData = async () => {
     }
   } catch (error) {
     console.error('加载地震数据失败:', error)
+  }
+}
+
+// 加载省份列表
+const loadProvinces = async () => {
+  try {
+    const response = await getProvinces()
+    if (response.code === 200) {
+      provinces.value = response.data
+    }
+  } catch (error) {
+    console.error('加载省份列表失败:', error)
   }
 }
 
@@ -210,6 +305,7 @@ watch(filteredEarthquakes, () => {
 })
 
 onMounted(() => {
+  loadProvinces()
   loadEarthquakeData()
   setTimeout(() => initMap(), 200)
 })
@@ -276,14 +372,15 @@ onBeforeUnmount(() => {
   padding: 12px 20px;
   display: flex;
   align-items: center;
-  gap: 32px;
+  gap: 20px;
   margin: 0 40px 20px;
+  flex-wrap: wrap;
 }
 
 .filter-group {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
 }
 
 .filter-label {

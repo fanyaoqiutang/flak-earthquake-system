@@ -3,6 +3,7 @@ from flask_login import LoginManager
 from flask_cors import CORS
 from models import db, User, Admin
 
+
 app = Flask(__name__)
 CORS(app, supports_credentials=True, origins=['http://localhost:5173', 'http://127.0.0.1:5173'])
 app.secret_key = "earthquake_2025_secure_key_change_in_production"
@@ -17,6 +18,8 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 from routes.admin_routes import admin_bp
 from routes.user_routes import user_bp
 from routes.common_routes import common_bp
+from routes.science_routes import science_bp
+from routes.admin_location_routes import admin_location_bp
 
 db.init_app(app)
 
@@ -41,6 +44,9 @@ def login():
 app.register_blueprint(admin_bp)
 app.register_blueprint(user_bp)
 app.register_blueprint(common_bp)
+app.register_blueprint(science_bp)
+app.register_blueprint(admin_location_bp)
+
 
 # 初始化数据
 with app.app_context():

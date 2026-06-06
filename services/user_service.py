@@ -1,9 +1,10 @@
 from flask import request, jsonify, session
 from flask_login import login_user, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-import secrets, datetime
+import secrets
+import datetime as dt
 from models import db, User, UserSubscribeProvince, UserEarthquakeAlert, Province, EarthquakeInfo, UserFeedback, \
-    ChatMessage
+    ChatMessage, City
 
 
 # ====================== 登录注册 ======================
@@ -37,27 +38,26 @@ def svc_user_login():
         return jsonify({"code": 401, "msg": "账号或密码错误"}), 401
 
     # 登录时更新最后活跃时间
-    u.last_active_time = datetime.datetime.now()
+    u.last_active_time = dt.datetime.now()
     db.session.commit()
 
     # 使用Flask-Login登录
     login_user(u, remember=True)  # 添加remember=True
-    
+
     # 设置session
     session['user_id'] = u.user_id
     session['user_account'] = u.user_account
     token = secrets.token_hex(32)
     session['user_token'] = token
-    
+
     # 确保session被保存
     session.modified = True
     session.permanent = True  # 设置为永久session
-    
+
     print(f"✅ 用户 {account} 登录成功, session ID: {session.sid if hasattr(session, 'sid') else 'N/A'}")
-    
+
     return jsonify({"code": 200, "msg": "登录成功",
                     "data": {"user_id": u.user_id, "user_account": u.user_account, "user_token": token}})
-
 
 def svc_user_logout():
     logout_user()
@@ -182,12 +182,16 @@ def svc_get_user_alerts():
     res = []
     for a in alerts:
         eq = EarthquakeInfo.query.get(a.earthquake_id)
-        p = Province.query.get(eq.province_id) if eq else None
+        # 通过 city_id 获取省份信息
+        city = City.query.get(eq.city_id) if eq else None
+        province = Province.query.get(city.province_id) if city else None
+
         res.append({
             "alert_id": a.id,
             "earthquake_id": a.earthquake_id,
             "is_read": a.is_read,
-            "province_name": p.province_name if p else "未知",
+            "province_name": province.province_name if province else "未知",
+            "city_name": city.city_name if city else "未知",
             "magnitude": eq.magnitude if eq else 0,
             "earthquake_time": eq.earthquake_time.strftime("%Y-%m-%d %H:%M:%S") if eq else "",
             "earthquake_message": eq.earthquake_message if eq else ""
@@ -342,21 +346,15 @@ def svc_get_chat_list():
     return jsonify({"code": 200, "data": res})
 
 
-# ... existing code ...
-
 def svc_update_user_info(user_id, data):
     """更新用户基础信息"""
     user = User.query.get(user_id)
     if not user:
         return jsonify({"code": 404, "msg": "用户不存在"}), 404
 
-    # 更新字段
-    if "nickname" in data:
-        user.user_nickname = data["nickname"]
+    # 更新字段（只保留实际存在的字段）
     if "phone" in data:
         user.phone = data["phone"]
-    if "email" in data:
-        user.email = data["email"]
 
     db.session.commit()
     return jsonify({"code": 200, "msg": "更新成功"})
@@ -375,7 +373,7 @@ def svc_change_password(user_id, data):
         return jsonify({"code": 400, "msg": "旧密码和新密码不能为空"}), 400
 
     # 验证旧密码
-    if not user.check_password(old_password):
+    if not check_password_hash(user.password, old_password):
         return jsonify({"code": 401, "msg": "旧密码错误"}), 401
 
     # 更新密码
