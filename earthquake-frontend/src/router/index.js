@@ -22,11 +22,23 @@ const routes = [
     component: () => import('@/views/Statistics.vue'),
     meta: { title: '数据统计' }
   },
-  {
+ {
     path: '/science',
     name: 'Science',
     component: () => import('@/views/Science.vue'),
     meta: { title: '科普中心' }
+  },
+   {
+    path: '/science/category/:categoryId',
+    name: 'ScienceCategory',
+    component: () => import('@/views/ScienceCategory.vue'),
+    meta: { title: '分类详情' }
+  },
+  {
+    path: '/science/article/:articleId',
+    name: 'ScienceDetail',
+    component: () => import('@/views/ScienceDetail.vue'),
+    meta: { title: '文章详情' }
   },
   {
     path: '/chat',
@@ -51,6 +63,12 @@ const routes = [
     name: 'AdminProfile',
     component: () => import('@/views/AdminProfile.vue'),
     meta: { title: '管理员中心', requiresAdmin: true }
+  },
+  {
+    path: '/admin/location-audit',
+    name: 'LocationAudit',
+    component: () => import('@/views/LocationAudit.vue'),
+    meta: { title: '位置审核管理', requiresAdmin: true }
   }
 ]
 
@@ -58,6 +76,7 @@ const router = createRouter({
   history: createWebHistory(),
   routes
 })
+
 
 // 路由守卫
 router.beforeEach((to, from, next) => {

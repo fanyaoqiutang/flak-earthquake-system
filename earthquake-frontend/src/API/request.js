@@ -16,12 +16,12 @@ request.interceptors.request.use(
     const userToken = localStorage.getItem('user_token')
     const adminToken = localStorage.getItem('admin_token')
 
-    // 只有当没有设置 X-Admin-Token 时，才添加用户 Token
-    // 避免管理员请求被误添加用户认证
+    if (userToken) {
+      config.headers['Authorization'] = `Bearer ${userToken}`
+    }
+
     if (adminToken) {
       config.headers['X-Admin-Token'] = adminToken
-    } else if (userToken) {
-      config.headers['Authorization'] = `Bearer ${userToken}`
     }
 
     console.log(`📤 请求: ${config.method?.toUpperCase()} ${config.url}`, config.params || config.data || '')
