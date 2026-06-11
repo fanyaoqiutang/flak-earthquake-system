@@ -249,3 +249,15 @@ export function getDashboardStats() {
   })
 }
 
+// 管理员发送聊天消息
+export function sendAdminChatMessage(data) {
+  const token = localStorage.getItem('admin_token')
+  return request({
+    url: '/user/chat/admin',
+    method: 'post',
+    headers: {
+      'X-Admin-Token': token
+    },
+    data
+  })
+}

@@ -82,6 +82,7 @@ export function getEarthquakeCityRank() {
     })
 }
 
+
 // 获取综合统计数据
 export function getEarthquakeStatistics(params) {
     return request({
@@ -90,3 +91,14 @@ export function getEarthquakeStatistics(params) {
         params
     })
 }
+
+// AI 智能问答
+export function aiChat(data) {
+    return request({
+        url: '/ai/chat',
+        method: 'post',
+        data
+    })
+}
+
+

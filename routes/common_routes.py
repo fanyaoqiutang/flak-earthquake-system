@@ -1,5 +1,5 @@
 from flask import Blueprint, request
-from services.common_service import svc_list_earthquake, svc_earthquake_stats_province, svc_earthquake_stats_city, svc_earthquake_stats_trend, svc_earthquake_stats_magnitude, svc_earthquake_rank, svc_earthquake_city_rank, svc_get_provinces_group_by_region, svc_get_all_provinces, svc_earthquake_statistics, svc_get_all_cities
+from services.common_service import svc_list_earthquake, svc_earthquake_stats_province, svc_earthquake_stats_city, svc_earthquake_stats_trend, svc_earthquake_stats_magnitude, svc_earthquake_rank, svc_earthquake_city_rank, svc_get_provinces_group_by_region, svc_get_all_provinces, svc_earthquake_statistics, svc_get_all_cities, svc_ai_chat
 
 common_bp = Blueprint("common", __name__, url_prefix="/api")
 
@@ -63,3 +63,11 @@ def get_provinces_group_by_region():
 @common_bp.route("/statistics", methods=["GET"])
 def earthquake_statistics():
     return svc_earthquake_statistics()
+
+# ======================
+# AI智能问答接口
+# ======================
+@common_bp.route("/ai/chat", methods=["POST"])
+def ai_chat():
+    """AI智能问答接口"""
+    return svc_ai_chat()

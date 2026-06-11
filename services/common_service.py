@@ -2,8 +2,13 @@ from flask import request, jsonify
 from models import EarthquakeInfo, Province, City, db, UserSubscribeProvince
 from sqlalchemy import func, and_
 from datetime import datetime, timedelta
+import requests as http_requests
+import os
 
 
+# ============ AI智能问答配置 ============
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
+DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
 
 # 地震列表信息按条件筛查
 def svc_list_earthquake():
@@ -416,3 +421,140 @@ def svc_earthquake_stats_magnitude():
         "code": 200,
         "data": result
     })
+
+
+# ============ AI智能问答服务 ============
+def svc_ai_chat():
+    """AI智能问答 - 调用DeepSeek API"""
+    import sys
+
+    # 强制刷新stdout，确保print立即显示
+    print("\n" + "=" * 60, flush=True)
+    print(" [AI DEBUG] svc_ai_chat 函数被调用！", flush=True)
+    print("=" * 60, flush=True)
+
+    try:
+        data = request.get_json()
+        print(f"📥 接收到的请求数据: {data}", flush=True)
+
+        messages = data.get("messages", [])
+        model = data.get("model", "deepseek-chat")
+
+        if not messages:
+            print("❌ 消息列表为空", flush=True)
+            return jsonify({"code": 400, "msg": "消息列表不能为空"}), 400
+
+        # 检查API密钥
+        print(f"\n DEEPSEEK_API_KEY状态:", flush=True)
+        print(f"   - 是否配置: {'✅ 已配置' if DEEPSEEK_API_KEY else '❌ 未配置'}", flush=True)
+        print(f"   - Key长度: {len(DEEPSEEK_API_KEY)}", flush=True)
+        print(f"   - Key前10位: {DEEPSEEK_API_KEY[:10] if DEEPSEEK_API_KEY else '无'}...", flush=True)
+
+        if not DEEPSEEK_API_KEY:
+            print("❌ API密钥未配置，返回500错误", flush=True)
+            return jsonify({
+                "code": 500,
+                "msg": "AI服务未配置，请联系管理员设置DEEPSEEK_API_KEY环境变量"
+            }), 500
+
+        # 系统提示：限定AI只回答地震科普
+        system_prompt = {
+            "role": "system",
+            "content": "你是地震预警科普助手，只能回答地震、防灾、避险、自救相关内容，无关问题请礼貌拒绝回答。"
+        }
+
+        headers = {
+            "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+            "Content-Type": "application/json"
+        }
+
+        body = {
+            "model": model,
+            "messages": [system_prompt] + messages
+        }
+
+        print(f"\n🚀 准备调用DeepSeek API:", flush=True)
+        print(f"   - URL: {DEEPSEEK_URL}", flush=True)
+        print(f"   - 模型: {model}", flush=True)
+        print(f"   - 消息数量: {len(body['messages'])}", flush=True)
+        print("=" * 50, flush=True)
+
+        response = http_requests.post(
+            DEEPSEEK_URL,
+            headers=headers,
+            json=body,
+            timeout=40
+        )
+
+        print(f"\n DeepSeek响应状态码: {response.status_code}", flush=True)
+
+        # 打印完整响应以便调试
+        if response.status_code != 200:
+            print(f"❌ DeepSeek错误响应: {response.text[:500]}", flush=True)
+        else:
+            print(f"✅ DeepSeek成功响应", flush=True)
+
+        if response.status_code != 200:
+            try:
+                error_detail = response.json()
+                error_msg = error_detail.get('error', {}).get('message', '未知错误')
+                error_code = error_detail.get('error', {}).get('type', 'unknown')
+                print(f" DeepSeek API错误详情: code={error_code}, message={error_msg}", flush=True)
+            except Exception as parse_err:
+                error_msg = response.text
+                print(f"❌ DeepSeek API错误（无法解析JSON）: {error_msg[:200]}", flush=True)
+                print(f"   JSON解析错误: {str(parse_err)}", flush=True)
+
+            return jsonify({
+                "code": 500,
+                "msg": f"AI服务调用失败: {error_msg}",
+                "data": {}
+            }), 500
+
+        res_json = response.json()
+
+        if not res_json.get("choices") or len(res_json["choices"]) == 0:
+            print(f"❌ DeepSeek返回格式异常: {res_json}", flush=True)
+            return jsonify({
+                "code": 500,
+                "msg": "AI回复格式异常",
+                "data": {}
+            }), 500
+
+        content = res_json["choices"][0]["message"]["content"]
+
+        print(f"\n✅ AI回复成功！", flush=True)
+        print(f"   - 内容长度: {len(content)} 字符", flush=True)
+        print(f"   - 内容预览: {content[:100]}...", flush=True)
+        print("=" * 60 + "\n", flush=True)
+
+        return jsonify({
+            "code": 200,
+            "data": {"content": content}
+        })
+
+    except http_requests.exceptions.Timeout:
+        print("\n⚠️ AI请求超时", flush=True)
+        return jsonify({
+            "code": 504,
+            "msg": "AI服务响应超时，请稍后重试",
+            "data": {}
+        }), 504
+    except http_requests.exceptions.ConnectionError as e:
+        print(f"\n❌ AI连接错误: {str(e)}", flush=True)
+        return jsonify({
+            "code": 503,
+            "msg": "无法连接到AI服务",
+            "data": {}
+        }), 503
+    except Exception as e:
+        print(f"\n AI异常捕获: {type(e).__name__}: {str(e)}", flush=True)
+        import traceback
+        print("完整堆栈信息:", flush=True)
+        traceback.print_exc()
+        print("=" * 60 + "\n", flush=True)
+        return jsonify({
+            "code": 500,
+            "msg": f"AI服务异常: {str(e)}",
+            "data": {}
+        }), 500
