@@ -74,16 +74,18 @@
     <el-main class="app-main">
       <router-view />
     </el-main>
+     <!-- AI 智能问答悬浮球 -->
+    <AiFloatBall v-if="isLoggedIn" />
   </div>
 </template>
 
-<script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+<script setup>import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   HomeFilled, DataAnalysis, Reading, ChatDotRound, Location, Bell, User, ArrowDown, SwitchButton
 } from '@element-plus/icons-vue'
+import AiFloatBall from './components/AiFloatBall.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -96,9 +98,35 @@ const activeIndex = computed(() => {
 const currentUser = ref('')
 const userRole = ref('')
 
+// 改进的登录状态管理(使用响应式)
+const loginState = ref(false)
+
 const isLoggedIn = computed(() => {
-  return localStorage.getItem('user_token') || localStorage.getItem('admin_token')
+  return loginState.value
 })
+
+// 封装刷新用户信息方法
+const loadUserInfo = () => {
+  const userToken = localStorage.getItem('user_token')
+  const adminToken = localStorage.getItem('admin_token')
+  const userAccount = localStorage.getItem('user_account')
+  const adminAccount = localStorage.getItem('admin_account')
+
+  // 更新登录状态
+  loginState.value = !!(userToken || adminToken)
+
+  if (userAccount) {
+    currentUser.value = userAccount
+    userRole.value = 'user'
+  } else if (adminAccount) {
+    currentUser.value = adminAccount
+    userRole.value = 'admin'
+  } else {
+    // 没数据清空
+    currentUser.value = ''
+    userRole.value = ''
+  }
+}
 
 onMounted(() => {
   loadUserInfo()
@@ -108,19 +136,6 @@ onMounted(() => {
 watch(() => route.path, () => {
   loadUserInfo()
 })
-
-const loadUserInfo = () => {
-  const userAccount = localStorage.getItem('user_account')
-  const adminAccount = localStorage.getItem('admin_account')
-
-  if (userAccount) {
-    currentUser.value = userAccount
-    userRole.value = 'user'
-  } else if (adminAccount) {
-    currentUser.value = adminAccount
-    userRole.value = 'admin'
-  }
-}
 
 const goToLogin = () => {
   router.push('/login')
@@ -143,6 +158,7 @@ const handleLogout = () => {
   localStorage.clear()
   ElMessage.success('退出登录成功')
   router.push('/login')
+  loadUserInfo() // 执行刷新状态
 }
 
 const handleCommand = (command) => {
@@ -161,6 +177,7 @@ const handleCommand = (command) => {
       userRole.value = ''
       ElMessage.success('已退出登录')
       router.push('/')
+      loadUserInfo() // 关键：重新刷新登录状态
     }).catch(() => {})
   }
 }

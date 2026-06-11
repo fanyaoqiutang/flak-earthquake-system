@@ -21,9 +21,8 @@
             </div>
             <div class="msg-content">{{ msg.text }}</div>
             <!-- 管理员操作按钮 -->
-            <div v-if="isAdmin" class="msg-actions">
-              <el-button type="danger" size="small" text @click="reportMessage(msg)">举报</el-button>
-              <el-button type="warning" size="small" text @click="muteUser(msg.user)">禁言</el-button>
+            <div v-if="isAdmin && !msg.isAdmin" class="msg-actions">
+              <el-button type="danger" size="small" text @click="deleteMessage(msg)">删除</el-button>
             </div>
           </div>
         </div>
@@ -46,6 +45,7 @@
           :rows="3"
           placeholder="请输入消息..."
           :disabled="!canChat"
+          @keyup.enter="sendMessage"
         />
         <div class="input-footer">
           <el-button type="primary" @click="sendMessage" :disabled="!canChat || !newMessage.trim()">
@@ -57,44 +57,59 @@
   </div>
 </template>
 
-<script setup>import { ref, computed, nextTick, onMounted } from 'vue'
+<script setup>
+import { ref, computed, nextTick, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { sendChatMessage, getChatList } from '../API/user'
+import { deleteChatMessage, sendAdminChatMessage } from '../API/admin'
 
 const router = useRouter()
 const newMessage = ref('')
 const messageListRef = ref(null)
 
+// 判断是否为管理员
+const isAdmin = computed(() => {
+  return !!localStorage.getItem('admin_token')
+})
+
+// 判断登录
 const isLoggedIn = computed(() => {
-  return !!localStorage.getItem('user_token')
+  return !!localStorage.getItem('user_token') || isAdmin.value
 })
 
 const canChat = computed(() => {
   return isLoggedIn.value
 })
 
+// 当前登录用户名
 const currentUser = computed(() => {
+  if (isAdmin.value) {
+    return localStorage.getItem('admin_account') || '管理员'
+  }
   return localStorage.getItem('user_account') || '匿名用户'
 })
 
 const messages = ref([])
 
+// 页面加载 → 获取聊天记录
 onMounted(() => {
   loadChatMessages()
 })
 
+// ====================== 加载消息（完全匹配后端返回结构） ======================
 const loadChatMessages = async () => {
   try {
     const response = await getChatList()
     if (response.code === 200) {
       messages.value = response.data.map(item => ({
         id: item.id,
-        user: item.username || item.user_account,
-        text: item.content,
-        time: new Date(item.create_time).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-        isAdmin: item.is_admin || false,
-        isSelf: item.user_id === getCurrentUserId()
+        user: item.username,       // 后端返回：username ✅
+        text: item.content,         // 后端返回：content ✅
+        time: item.create_time,     // 后端已格式化好 ✅
+        isAdmin: item.username === '管理员', // 后端写死管理员名称 ✅
+        isSelf: (isAdmin.value && item.username === '管理员') ||
+                (!isAdmin.value && item.user_id == getCurrentUserId()) // 对比 user_id ✅
       }))
 
       nextTick(() => {
@@ -106,10 +121,15 @@ const loadChatMessages = async () => {
   }
 }
 
+// 获取当前登录用户ID
 const getCurrentUserId = () => {
+  if (isAdmin.value) {
+    return null // 管理员没有user_id
+  }
   return localStorage.getItem('user_id')
 }
 
+// ====================== 发送消息（完全匹配后端接收字段） ======================
 const sendMessage = async () => {
   if (!canChat.value) {
     ElMessage.warning('请先以用户身份登录')
@@ -122,30 +142,54 @@ const sendMessage = async () => {
   }
 
   try {
-    const response = await sendChatMessage({ content: newMessage.value })
+    let response
+    // 如果是管理员，使用管理员接口发送
+    if (isAdmin.value) {
+      response = await sendAdminChatMessage({
+        content: newMessage.value
+      })
+    } else {
+      response = await sendChatMessage({
+        content: newMessage.value  // 后端接收：content ✅
+      })
+    }
+
     if (response.code === 200) {
       ElMessage.success('发送成功')
       newMessage.value = ''
-      loadChatMessages()
+      loadChatMessages() // 重新拉取最新消息
+    } else {
+      ElMessage.error(response.msg || '发送失败')
     }
   } catch (error) {
     console.error('发送消息失败:', error)
-    ElMessage.error('发送消息失败')
+    ElMessage.error('发送消息失败，请检查登录状态')
   }
 }
 
+// 滚动到底部
 const scrollToBottom = () => {
   if (messageListRef.value) {
     messageListRef.value.scrollTop = messageListRef.value.scrollHeight
   }
 }
 
-const reportMessage = (msg) => {
-  ElMessage.success(`已举报 ${msg.user} 的消息`)
-}
-
-const muteUser = (user) => {
-  ElMessage.warning(`已禁言用户: ${user}`)
+// 删除消息（仅管理员可用）
+const deleteMessage = (msg) => {
+  ElMessageBox.confirm('确定要删除这条消息吗？', '提示', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning'
+  }).then(async () => {
+    try {
+      await deleteChatMessage(msg.id)
+      ElMessage.success('删除成功')
+      loadChatMessages() // 重新加载消息列表
+    } catch (error) {
+      console.error('删除消息失败:', error)
+      ElMessage.error('删除失败')
+    }
+  }).catch(() => {})
 }
 </script>
 

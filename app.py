@@ -2,7 +2,10 @@ from flask import Flask,render_template
 from flask_login import LoginManager
 from flask_cors import CORS
 from models import db, User, Admin
+from dotenv import load_dotenv
 
+# 加载 .env 文件中的环境变量
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True, origins=['http://localhost:5173', 'http://127.0.0.1:5173'])

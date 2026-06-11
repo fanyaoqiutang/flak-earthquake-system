@@ -105,7 +105,7 @@
             <h2>地震数据管理</h2>
           </div>
           <el-table :data="earthquakes" v-loading="loading" style="width: 100%">
-            <el-table-column prop="city.city_name" label="城市" width="120" />
+            <el-table-column prop="city_name" label="城市" width="120" />
             <el-table-column label="日期" width="120">
               <template #default="{ row }">
                 {{ formatDate(row.earthquake_time) }}
