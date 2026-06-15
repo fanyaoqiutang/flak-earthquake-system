@@ -86,13 +86,14 @@ def admin_feedback_handle(fb_id):
 # ======================
 # 聊天管理
 # ======================
+
 @admin_bp.route("/chat-records", methods=["GET"])
 def admin_chat_records():
     return svc_admin_get_chat_records()
 
-@admin_bp.route("/chat/list", methods=["GET"])
-def admin_chat_list():
-    return svc_admin_get_all_chat_messages()
+@admin_bp.route("/chat-records/<int:msg_id>", methods=["DELETE"])
+def admin_chat_record_delete(msg_id):
+    return svc_admin_delete_chat_msg(msg_id)
 
 @admin_bp.route("/chat/delete/<int:msg_id>", methods=["POST"])
 def admin_chat_delete(msg_id):

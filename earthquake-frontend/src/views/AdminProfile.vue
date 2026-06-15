@@ -202,18 +202,18 @@
           <el-table :data="chatRecords" v-loading="loading" style="width: 100%">
             <el-table-column label="日期" width="120">
               <template #default="{ row }">
-                {{ formatDate(row.created_at) }}
+                {{ formatDate(row.create_time) }}
               </template>
             </el-table-column>
-            <el-table-column prop="user.username" label="用户" width="120" />
-            <el-table-column prop="user_message" label="用户提问" min-width="200" />
-            <el-table-column prop="admin_response" label="管理员回复" min-width="200" />
+            <el-table-column prop="username" label="用户" width="120" />
+            <el-table-column prop="content" label="聊天内容" min-width="400" />
             <el-table-column label="操作" width="120">
               <template #default="{ row }">
                 <el-button type="danger" size="small" @click="handleDeleteChat(row)">删除</el-button>
               </template>
             </el-table-column>
           </el-table>
+
           <div class="pagination-container">
             <el-pagination
                 v-model:current-page="chatCurrentPage"
