@@ -4,17 +4,62 @@
     <div class="main-content">
       <!-- 左侧预警列表 -->
       <div class="left-panel">
-        <div class="warning-item" v-for="i in 4" :key="i">
-          <div class="warning-header">
-            <span class="warning-time">2026-05-25 10:30:00</span>
-            <el-tag type="danger" size="small">M5.2</el-tag>
-          </div>
-          <div class="warning-content">
-            <h4>四川省雅安市发生5.2级地震</h4>
-            <p>震源深度: 10KM | 经纬度: 30.05°N, 103.00°E</p>
-            <p class="warning-tip">⚠️ 请当地居民注意防范,做好应急准备</p>
-          </div>
+        <div v-if="!isLoggedIn" class="login-hint">
+          <el-alert
+            title="登录后查看订阅省份的地震预警"
+            type="info"
+            :closable="false"
+            show-icon
+          />
         </div>
+        <div v-else-if="subscribedProvinceIds.length === 0" class="subscribe-hint">
+          <el-alert
+            title="请先订阅省份以查看地震预警"
+            type="warning"
+            :closable="false"
+            show-icon
+          />
+          <el-button type="primary" @click="showSubscribeDialog" style="margin-top: 10px;">
+            管理订阅省份
+          </el-button>
+        </div>
+        <template v-else>
+          <div v-if="loading" class="loading-wrapper">
+            <el-skeleton :rows="5" animated />
+          </div>
+          <div v-else-if="earthquakeList.length === 0" class="empty-warning">
+            <el-empty description="您订阅的省份暂无地震预警信息" />
+          </div>
+          <div
+            v-else
+            class="warning-item"
+            v-for="eq in earthquakeList"
+            :key="eq.earthquake_id || eq.time"
+          >
+            <div class="warning-header">
+              <span class="warning-time">{{ formatTime(eq.earthquake_time) }}</span>
+              <el-tag type="danger" size="small">M{{ eq.magnitude }}</el-tag>
+            </div>
+            <div class="warning-content">
+              <h4>{{ getWarningTitle(eq) }}</h4>
+              <p>震源深度: {{ eq.depth }}KM | 经纬度: {{ eq.latitude }}°N, {{ eq.longitude }}°E</p>
+              <p class="warning-tip">⚠️ 请当地居民注意防范,做好应急准备</p>
+            </div>
+          </div>
+
+          <!-- 分页组件 -->
+          <div v-if="earthquakeList.length > 0 && total > pageSize" class="pagination-wrapper">
+            <el-pagination
+              v-model:current-page="currentPage"
+              v-model:page-size="pageSize"
+              :total="total"
+              :page-sizes="[8, 16, 24]"
+              layout="total, sizes, prev, pager, next, jumper"
+              @size-change="handleSizeChange"
+              @current-change="handleCurrentChange"
+            />
+          </div>
+        </template>
       </div>
 
       <!-- 右侧面板 -->
@@ -96,6 +141,19 @@
               <el-option label="6.0级以上" value="6" />
               <el-option label="7.0级以上" value="7" />
             </el-select>
+          </div>
+
+          <!-- 开发测试按钮 -->
+          <div class="setting-divider"></div>
+          <div class="setting-item" style="justify-content: center;">
+            <el-button
+              type="warning"
+              size="small"
+              @click="testAlert"
+              :disabled="!isLoggedIn || subscribedProvinceIds.length === 0"
+            >
+              🧪 测试预警弹窗
+            </el-button>
           </div>
         </div>
       </div>
@@ -179,7 +237,7 @@
           </div>
           <div class="alert-details">
             <p>🕒 时间: {{ currentAlert.time }}</p>
-            <p>📍 位置: {{ currentAlert.location }}</p>
+            <p> 位置: {{ currentAlert.location }}</p>
             <p>💡 提示: {{ currentAlert.tip }}</p>
           </div>
         </div>
@@ -196,9 +254,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElNotification } from 'element-plus'
 import { Lock, Bell, VideoCamera, Check } from '@element-plus/icons-vue'
 import {
   getSubscriptions,
@@ -207,6 +265,7 @@ import {
   getAlertSettings,
   updateAlertSettings
 } from '../API/user'
+import { getEarthquakeList } from '../API/common'
 
 const router = useRouter()
 const dialogVisible = ref(false)
@@ -214,15 +273,26 @@ const alertDialogVisible = ref(false)
 const countdownSeconds = ref(25)
 const saving = ref(false)
 const loadingRegions = ref(false)
+const loading = ref(false)
 
 const currentUser = ref('')
 const userRole = ref('')
+const earthquakeList = ref([])
+const total = ref(0)
+const currentPage = ref(1)
+const pageSize = ref(8)
+
+// 预警相关
+const lastCheckTime = ref(null)
+const pollingTimer = ref(null)
+const hasNewAlert = ref(false)
 
 const isLoggedIn = computed(() => {
   return localStorage.getItem('user_token') || localStorage.getItem('admin_token')
 })
 
 const subscriptions = ref([])
+const subscribedProvinceIds = ref([])
 const regionData = ref([])
 const selectedProvinceIds = ref([])
 
@@ -240,7 +310,7 @@ const currentAlert = ref({
   tip: ''
 })
 
-// 内联省份地区数据（避免后端接口调用失败）
+// 内联省份地区数据
 const defaultRegionData = [
   {
     region_name: "华北地区",
@@ -320,13 +390,233 @@ const defaultRegionData = [
 
 onMounted(() => {
   loadUserInfo()
-  // 直接使用内联数据
   regionData.value = defaultRegionData
   if (isLoggedIn.value) {
     loadSubscriptions()
     loadAlertSettings()
   }
+  loadEarthquakeList()
+
+  // 启动预警轮询（每30秒检查一次）
+  startAlertPolling()
 })
+
+onUnmounted(() => {
+  stopAlertPolling()
+})
+
+const startAlertPolling = () => {
+  if (!isLoggedIn.value || subscribedProvinceIds.value.length === 0) {
+    console.log('⚠️ 未登录或未订阅，不启动预警轮询')
+    return
+  }
+
+  console.log('🔔 启动预警轮询，间隔30秒')
+  lastCheckTime.value = new Date()
+
+  pollingTimer.value = setInterval(() => {
+    checkForNewAlerts()
+  }, 30000)
+}
+
+const stopAlertPolling = () => {
+  if (pollingTimer.value) {
+    clearInterval(pollingTimer.value)
+    pollingTimer.value = null
+    console.log('️ 停止预警轮询')
+  }
+}
+
+const checkForNewAlerts = async () => {
+  if (!isLoggedIn.value || subscribedProvinceIds.value.length === 0) {
+    return
+  }
+
+  try {
+    console.log('🔍 检查新地震预警...', new Date().toLocaleTimeString())
+
+    const response = await getEarthquakeList({ limit: 50 })
+    if (response.code === 200) {
+      const allData = Array.isArray(response.data) ? response.data : []
+
+      const subscribedEarthquakes = allData.filter(eq =>
+        subscribedProvinceIds.value.includes(getProvinceIdByName(eq.province_name))
+      )
+
+      const newAlerts = subscribedEarthquakes.filter(eq => {
+        if (!lastCheckTime.value) return false
+
+        const eqTime = new Date(eq.earthquake_time)
+        return eqTime > lastCheckTime.value &&
+               parseFloat(eq.magnitude) >= parseFloat(settings.value.threshold)
+      })
+
+      if (newAlerts.length > 0) {
+        const latestAlert = newAlerts.sort((a, b) =>
+          new Date(b.earthquake_time) - new Date(a.earthquake_time)
+        )[0]
+
+        console.log('🚨 发现新预警！', latestAlert)
+
+        showEarthquakeAlert(latestAlert)
+        sendBrowserNotification(latestAlert)
+
+        if (settings.value.soundAlert) {
+          playAlertSound()
+        }
+      }
+
+      lastCheckTime.value = new Date()
+    }
+  } catch (err) {
+    console.error('检查新预警失败:', err)
+  }
+}
+
+const showEarthquakeAlert = (eq) => {
+  currentAlert.value = {
+    province: eq.province_name,
+    city: eq.city_name,
+    magnitude: eq.magnitude,
+    time: eq.earthquake_time,
+    location: `${eq.province_name}${eq.city_name || '某地'} (${eq.latitude}°N, ${eq.longitude}°E)`,
+    depth: eq.depth,
+    tip: `震源深度${eq.depth}KM，请当地居民注意防范，做好应急准备`
+  }
+
+  alertDialogVisible.value = true
+  startCountdown()
+  hasNewAlert.value = true
+}
+
+const sendBrowserNotification = (eq) => {
+  if ('Notification' in window && Notification.permission === 'granted') {
+    const notification = new Notification(`⚠️ ${eq.province_name}发生${eq.magnitude}级地震`, {
+      body: `时间: ${eq.earthquake_time}\n地点: ${eq.province_name}${eq.city_name || ''}\n震源深度: ${eq.depth}KM\n请立即采取避险措施！`,
+      icon: '/favicon.svg',
+      tag: 'earthquake-alert',
+      requireInteraction: true
+    })
+
+    notification.onclick = () => {
+      window.focus()
+      notification.close()
+    }
+  } else if ('Notification' in window && Notification.permission !== 'denied') {
+    Notification.requestPermission().then(permission => {
+      if (permission === 'granted') {
+        sendBrowserNotification(eq)
+      }
+    })
+  }
+}
+
+const playAlertSound = () => {
+  try {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+    const oscillator = audioContext.createOscillator()
+    const gainNode = audioContext.createGain()
+
+    oscillator.connect(gainNode)
+    gainNode.connect(audioContext.destination)
+
+    oscillator.frequency.value = 800
+    oscillator.type = 'sine'
+
+    gainNode.gain.setValueAtTime(0.5, audioContext.currentTime)
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5)
+
+    oscillator.start(audioContext.currentTime)
+    oscillator.stop(audioContext.currentTime + 0.5)
+  } catch (err) {
+    console.log('播放提示音失败:', err)
+  }
+}
+
+const loadEarthquakeList = async () => {
+  loading.value = true
+  try {
+    if (isLoggedIn.value && subscribedProvinceIds.value.length > 0) {
+      const response = await getEarthquakeList({ limit: 100 })
+      if (response.code === 200) {
+        const allData = Array.isArray(response.data) ? response.data : []
+
+        const filteredData = allData.filter(eq =>
+          subscribedProvinceIds.value.includes(getProvinceIdByName(eq.province_name))
+        )
+
+        total.value = filteredData.length
+
+        const start = (currentPage.value - 1) * pageSize.value
+        const end = start + pageSize.value
+        earthquakeList.value = filteredData.slice(start, end)
+
+        console.log('✅ 已加载订阅省份地震列表:', earthquakeList.value)
+        console.log('总数:', total.value, '当前页:', currentPage.value, '每页:', pageSize.value)
+        console.log('订阅省份IDs:', subscribedProvinceIds.value)
+
+        if (filteredData.length > 0) {
+          const latestTime = new Date(filteredData[0].earthquake_time)
+          if (!lastCheckTime.value || latestTime > lastCheckTime.value) {
+            lastCheckTime.value = latestTime
+          }
+        }
+      } else {
+        ElMessage.error('加载地震数据失败')
+      }
+    } else {
+      earthquakeList.value = []
+      total.value = 0
+    }
+  } catch (err) {
+    console.error('加载地震列表失败:', err)
+    ElMessage.error('网络错误，请稍后重试')
+  } finally {
+    loading.value = false
+  }
+}
+
+const getProvinceIdByName = (provinceName) => {
+  if (!provinceName) return null
+
+  for (const region of defaultRegionData) {
+    for (const province of region.province_list) {
+      if (province.province_name === provinceName) {
+        return province.province_id
+      }
+    }
+  }
+  return null
+}
+
+const handleSizeChange = (val) => {
+  pageSize.value = val
+  currentPage.value = 1
+  loadEarthquakeList()
+}
+
+const handleCurrentChange = (val) => {
+  currentPage.value = val
+  loadEarthquakeList()
+}
+
+const formatTime = (timeStr) => {
+  if (!timeStr) return ''
+  return timeStr
+}
+
+const getWarningTitle = (eq) => {
+  const provinceName = eq.province_name || ''
+  const cityName = eq.city_name || ''
+
+  if (cityName) {
+    return `${provinceName}${cityName}发生${eq.magnitude}级地震`
+  }
+  if (provinceName) {
+    return `${provinceName}发生${eq.magnitude}级地震`
+  }
+  return `未知地点发生${eq.magnitude}级地震`
+}
 
 const loadUserInfo = () => {
   const userAccount = localStorage.getItem('user_account')
@@ -349,14 +639,22 @@ const loadSubscriptions = async () => {
     if (response.code === 200) {
       subscriptions.value = Array.isArray(response.data) ? response.data : []
       selectedProvinceIds.value = subscriptions.value.map(item => item.province_id)
-      console.log('✅ 已订阅省份:', selectedProvinceIds.value)
+
+      subscribedProvinceIds.value = [...selectedProvinceIds.value]
+
+      console.log('✅ 已订阅省份:', subscribedProvinceIds.value)
+
+      stopAlertPolling()
+      startAlertPolling()
+
+      loadEarthquakeList()
     }
   } catch (err) {
     console.error('加载订阅失败:', err)
     selectedProvinceIds.value = []
+    subscribedProvinceIds.value = []
   }
 }
-
 
 const loadAlertSettings = async () => {
   if (!isLoggedIn.value) return
@@ -376,7 +674,6 @@ const loadAlertSettings = async () => {
 }
 
 const showSubscribeDialog = async () => {
-  // 检查登录状态
   const hasUserToken = localStorage.getItem('user_token')
   const hasAdminToken = localStorage.getItem('admin_token')
 
@@ -391,7 +688,6 @@ const showSubscribeDialog = async () => {
     return
   }
 
-  // 如果是admin，提示
   if (hasAdminToken && !hasUserToken) {
     ElMessage.warning('请使用普通用户账号登录后再管理订阅')
     return
@@ -406,20 +702,17 @@ const showSubscribeDialog = async () => {
   }
 }
 
-// 判断地区是否全部选中
 const isRegionAllSelected = (region) => {
   if (!Array.isArray(selectedProvinceIds.value) || region.province_list.length === 0) return false
   return region.province_list.every(p => selectedProvinceIds.value.includes(p.province_id))
 }
 
-// 判断地区是否部分选中
 const isRegionPartiallySelected = (region) => {
   if (!Array.isArray(selectedProvinceIds.value)) return false
   const selectedCount = region.province_list.filter(p => selectedProvinceIds.value.includes(p.province_id)).length
   return selectedCount > 0 && selectedCount < region.province_list.length
 }
 
-// 切换整个地区的选中状态
 const toggleRegion = (region) => {
   if (!Array.isArray(selectedProvinceIds.value)) {
     selectedProvinceIds.value = []
@@ -428,7 +721,6 @@ const toggleRegion = (region) => {
   const allSelected = isRegionAllSelected(region)
 
   if (allSelected) {
-    // 取消该地区所有省份
     region.province_list.forEach(p => {
       const index = selectedProvinceIds.value.indexOf(p.province_id)
       if (index > -1) {
@@ -436,7 +728,6 @@ const toggleRegion = (region) => {
       }
     })
   } else {
-    // 选中该地区所有省份
     region.province_list.forEach(p => {
       if (!selectedProvinceIds.value.includes(p.province_id)) {
         selectedProvinceIds.value.push(p.province_id)
@@ -445,7 +736,6 @@ const toggleRegion = (region) => {
   }
 }
 
-// 切换单个省份
 const toggleProvince = (province) => {
   if (!Array.isArray(selectedProvinceIds.value)) {
     selectedProvinceIds.value = []
@@ -463,6 +753,12 @@ const removeSubscription = async (sub) => {
   try {
     await unsubscribeProvince(sub.id)
     ElMessage.success(`已取消订阅: ${sub.province_name}`)
+
+    const index = subscribedProvinceIds.value.indexOf(sub.province_id)
+    if (index > -1) {
+      subscribedProvinceIds.value.splice(index, 1)
+    }
+
     loadSubscriptions()
   } catch (err) {
     console.error('取消订阅失败:', err)
@@ -473,12 +769,18 @@ const removeSubscription = async (sub) => {
 const saveSubscriptions = async () => {
   try {
     saving.value = true
-
-    // 传递省份ID数组给后端
     await subscribeBatch({ province_ids: selectedProvinceIds.value })
+
+    subscribedProvinceIds.value = [...selectedProvinceIds.value]
 
     ElMessage.success('订阅设置已保存')
     dialogVisible.value = false
+
+    currentPage.value = 1
+
+    stopAlertPolling()
+    startAlertPolling()
+
     loadSubscriptions()
   } catch (err) {
     console.error('保存订阅失败:', err)
@@ -524,6 +826,40 @@ const handleAlertClose = () => {
 const confirmAlert = () => {
   alertDialogVisible.value = false
   ElMessage.success('感谢确认，请做好防范措施')
+  hasNewAlert.value = false
+}
+
+// 测试预警弹窗（开发用）
+const testAlert = () => {
+  if (subscriptions.value.length === 0) {
+    ElMessage.warning('请先订阅省份')
+    return
+  }
+
+  const randomSub = subscriptions.value[Math.floor(Math.random() * subscriptions.value.length)]
+
+  currentAlert.value = {
+    province: randomSub.province_name,
+    city: '测试市',
+    magnitude: '5.2',
+    time: new Date().toLocaleString('zh-CN'),
+    location: `${randomSub.province_name}测试市 (30.05°N, 103.00°E)`,
+    depth: 10,
+    tip: '【测试】这是预警功能测试，请当地居民注意防范，做好应急准备'
+  }
+
+  alertDialogVisible.value = true
+  startCountdown()
+
+  sendBrowserNotification({
+    province_name: randomSub.province_name,
+    city_name: '测试市',
+    magnitude: '5.2',
+    earthquake_time: new Date().toLocaleString('zh-CN'),
+    depth: 10
+  })
+
+  ElMessage.success('测试预警已触发')
 }
 </script>
 
@@ -544,6 +880,35 @@ const confirmAlert = () => {
   display: flex;
   flex-direction: column;
   gap: 15px;
+}
+
+.loading-wrapper {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.empty-warning {
+  background: white;
+  border-radius: 12px;
+  padding: 40px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  text-align: center;
+}
+
+.login-hint, .subscribe-hint {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  text-align: center;
+}
+
+.subscribe-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .warning-item {
@@ -587,6 +952,13 @@ const confirmAlert = () => {
 .warning-tip {
   color: #f56c6c !important;
   font-weight: 500;
+}
+
+.pagination-wrapper {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+  padding: 10px 0;
 }
 
 .right-panel {
@@ -723,7 +1095,6 @@ const confirmAlert = () => {
   font-size: 16px;
 }
 
-/* 地区列表样式 */
 .region-list {
   max-height: 500px;
   overflow-y: auto;
@@ -797,7 +1168,6 @@ const confirmAlert = () => {
   box-shadow: 0 2px 8px rgba(64, 158, 255, 0.1);
 }
 
-/* 对话框底部 */
 .dialog-footer {
   display: flex;
   justify-content: space-between;
@@ -823,7 +1193,6 @@ const confirmAlert = () => {
   gap: 12px;
 }
 
-/* 预警弹窗样式 */
 .alert-content {
   display: flex;
   justify-content: space-between;

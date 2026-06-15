@@ -100,6 +100,7 @@ onMounted(() => {
 // ====================== 加载消息（完全匹配后端返回结构） ======================
 const loadChatMessages = async () => {
   try {
+
     const response = await getChatList()
     if (response.code === 200) {
       messages.value = response.data.map(item => ({
