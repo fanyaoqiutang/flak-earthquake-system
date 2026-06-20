@@ -234,172 +234,206 @@ const handleRegister = async () => {
 }
 </script>
 
-
 <style scoped>
+/* 背景更换：极简干净浅灰，去掉渐变 */
 .login-container {
-  min-height: calc(100vh - 64px);
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+  background: #f5f7fa;
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 20px;
+  padding: 24px 16px;
 }
 
+/* 登录卡片加宽，最大宽度620，左右留白减少，内容区域更大 */
 .login-box {
-  background: white;
-  padding: 40px;
-  border-radius: 16px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  background: #ffffff;
+  padding: 44px 48px;
+  border-radius: 20px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
   width: 100%;
-  max-width: 480px;
+  max-width: 620px;
 }
 
+/* 头部标题区域 */
 .login-header {
   text-align: center;
-  margin-bottom: 30px;
+  margin-bottom: 36px;
 }
 
 .login-header h1 {
-  color: #2c3e50;
-  margin-bottom: 10px;
-  font-size: 26px;
-  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 10px;
+  font-size: 28px;
+  font-weight: 650;
+  letter-spacing: 1px;
 }
 
 .login-header p {
-  color: #909399;
+  color: #6b7280;
   font-size: 14px;
 }
 
+/* 身份切换标签美化 */
 .login-tabs {
   display: flex;
-  margin-bottom: 30px;
-  border: 2px solid #e4e7ed;
-  border-radius: 8px;
+  margin-bottom: 32px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 12px;
   overflow: hidden;
 }
 
 .tab {
   flex: 1;
   text-align: center;
-  padding: 14px;
+  padding: 16px 0;
   cursor: pointer;
-  color: #909399;
+  color: #6b7280;
   font-size: 15px;
-  transition: all 0.3s;
+  transition: all 0.26s ease;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
 }
 
+.tab:hover:not(.active) {
+  background: #f9fafb;
+}
+
 .tab.active {
-  background: #409eff;
-  color: white;
-  font-weight: bold;
+  background: #1f2937;
+  color: #ffffff;
+  font-weight: 600;
 }
 
+/* 表单整体间距 */
 .login-form {
-  margin-top: 20px;
+  margin-top: 4px;
 }
 
+/* 登录按钮主样式 深色匹配简约风格 */
 .login-btn {
   width: 100%;
-  height: 46px;
+  height: 48px;
   font-size: 17px;
   font-weight: 600;
   letter-spacing: 2px;
+  border-radius: 10px;
+  background: #1f2937;
+  border: none;
 }
 
+.login-btn:hover {
+  background: #111827 !important;
+}
+
+/* 注册按钮 */
 .register-btn {
   width: 100%;
-  height: 46px;
+  height: 48px;
   font-size: 17px;
   font-weight: 600;
   letter-spacing: 2px;
-  background: white;
-  border: 2px solid #409eff;
-  color: #409eff;
+  background: #ffffff;
+  border: 1.8px solid #1f2937;
+  color: #1f2937;
+  border-radius: 10px;
 }
 
 .register-btn:hover {
-  background: #ecf5ff;
+  background: #f3f4f6 !important;
 }
 
+/* 测试账号区域 */
 .test-accounts {
-  margin-top: 25px;
-  padding: 15px;
-  background: #f0f9ff;
-  border-radius: 8px;
-  border: 1px solid #bae7ff;
+  margin-top: 28px;
+  padding: 18px;
+  background: #f9fafb;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
 }
 
 .test-title {
-  font-weight: bold;
-  color: #1890ff;
-  margin-bottom: 12px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 14px;
   font-size: 14px;
 }
 
 .account-item {
   display: flex;
   align-items: center;
-  padding: 10px;
-  margin: 8px 0;
-  background: white;
-  border-radius: 6px;
+  padding: 12px 14px;
+  margin: 10px 0 0;
+  background: #ffffff;
+  border-radius: 10px;
   cursor: pointer;
-  transition: all 0.3s;
-  border: 1px solid #e8e8e8;
+  transition: all 0.24s ease;
+  border: 1px solid #e2e8f0;
 }
 
 .account-item:hover {
-  background: #e6f7ff;
-  border-color: #1890ff;
-  transform: translateX(5px);
+  background: #f3f4f6;
+  border-color: #1f2937;
+  transform: translateX(6px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
 }
 
 .badge {
-  padding: 4px 10px;
-  border-radius: 4px;
+  padding: 5px 11px;
+  border-radius: 6px;
   font-size: 12px;
-  font-weight: bold;
-  margin-right: 12px;
+  font-weight: 600;
+  margin-right: 14px;
 }
 
 .user-badge {
-  background: #e6f7ff;
-  color: #1890ff;
+  background: #eff6ff;
+  color: #1d4ed8;
 }
 
 .admin-badge {
-  background: #fff1f0;
-  color: #f5222d;
+  background: #fef2f2;
+  color: #dc2626;
 }
 
 .account-text {
   flex: 1;
-  font-family: monospace;
-  color: #595959;
+  font-family: 'Consolas', monospace;
+  color: #374151;
   font-size: 14px;
 }
 
 .arrow-icon {
-  color: #1890ff;
-  font-size: 16px;
+  color: #4b5563;
+  font-size: 17px;
+  transition: transform 0.2s;
 }
 
+.account-item:hover .arrow-icon {
+  transform: translateX(3px);
+}
+
+/* 底部提示文字 */
 .tips {
-  margin-top: 20px;
-  padding: 12px;
-  background: #f6ffed;
-  border-radius: 8px;
+  margin-top: 24px;
+  padding: 13px 16px;
+  background: #f0fdf4;
+  border-radius: 10px;
   text-align: center;
-  color: #52c41a;
+  color: #16a34a;
   font-size: 13px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+}
+
+/* 输入框全局微调 */
+:deep(.el-input__inner) {
+  height: 48px;
+  border-radius: 10px;
+  font-size: 15px;
 }
 </style>

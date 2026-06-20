@@ -246,30 +246,27 @@ def svc_earthquake_city_rank():
 
 # 统计多条件统计 支持省份，城市，时间范围，最低震级筛选，一次返回趋势，震级，省份排行
 def svc_earthquake_statistics():
-    # 获取前端筛选参数
     province_id = request.args.get('province_id')
     city_id = request.args.get('city_id')
     start_time = request.args.get('start_time')
     end_time = request.args.get('end_time')
     mag_min = request.args.get('mag_min', 0, type=float)
+    mag_max = request.args.get('mag_max', 99.9, type=float)
 
     query = EarthquakeInfo.query.join(City, EarthquakeInfo.city_id == City.city_id)
 
-    # 省份筛选
     if province_id:
         try:
             query = query.filter(City.province_id == int(province_id))
         except:
             return jsonify({"code": 400, "msg": "省份ID格式错误"}), 400
 
-    # 城市筛选
     if city_id:
         try:
             query = query.filter(EarthquakeInfo.city_id == int(city_id))
         except:
             return jsonify({"code": 400, "msg": "城市ID格式错误"}), 400
 
-    # 时间范围筛选
     if start_time and end_time:
         try:
             start_dt = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
@@ -283,16 +280,22 @@ def svc_earthquake_statistics():
         except:
             return jsonify({"code": 400, "msg": "时间格式错误"}), 400
 
-    # 最低震级筛选
     if mag_min > 0:
         query = query.filter(EarthquakeInfo.magnitude >= mag_min)
+    
+    if mag_max < 99.9:
+        query = query.filter(EarthquakeInfo.magnitude <= mag_max)
 
     earthquake_list = query.all()
 
-    trend_data = get_trend_data(earthquake_list)
+    time_range_type = _get_time_range_type(start_time, end_time)
+    trend_data = get_trend_data(earthquake_list, time_range_type)
     magnitude_data = get_magnitude_data(earthquake_list)
     province_data = get_province_data(earthquake_list)
     city_data = get_city_data(earthquake_list)
+    
+    summary_data = get_summary_with_comparison(earthquake_list, province_id, city_id, start_time, end_time, mag_min, mag_max)
+    risk_level = calculate_risk_level(earthquake_list)
 
     return jsonify({
         "code": 200,
@@ -300,27 +303,80 @@ def svc_earthquake_statistics():
             "trend": trend_data,
             "magnitude": magnitude_data,
             "province": province_data,
-            "city": city_data
+            "city": city_data,
+            "summary": summary_data,
+            "risk_level": risk_level
         }
     })
 
 
-# 生成时间趋势
-def get_trend_data(earthquake_list):
+def _get_time_range_type(start_time, end_time):
+    if not start_time or not end_time:
+        return '7d'
+    
+    try:
+        start_dt = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+        end_dt = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
+        delta = end_dt - start_dt
+        
+        if delta.total_seconds() <= 24 * 3600:
+            return '24h'
+        elif delta.days <= 7:
+            return '7d'
+        elif delta.days <= 30:
+            return '30d'
+        elif delta.days <= 365:
+            return '1y'
+        else:
+            return 'custom'
+    except:
+        return '7d'
+
+
+def get_trend_data(earthquake_list, time_range_type='7d'):
     trend_dict = {}
+    max_mag_by_date = {}
+    provinces_by_date = {}
 
     for eq in earthquake_list:
-        date_str = eq.earthquake_time.strftime("%Y-%m-%d")
-        trend_dict[date_str] = trend_dict.get(date_str, 0) + 1
-    # 按日期排序，列表返回
-    trend_list = [{"date": k, "count": v} for k, v in sorted(trend_dict.items())]
+        if time_range_type == '24h':
+            date_str = eq.earthquake_time.strftime("%Y-%m-%d %H:00")
+        elif time_range_type in ['7d', '30d']:
+            date_str = eq.earthquake_time.strftime("%Y-%m-%d")
+        elif time_range_type == '1y':
+            date_str = eq.earthquake_time.strftime("%Y-%m")
+        else:
+            date_str = eq.earthquake_time.strftime("%Y-%m-%d")
+        
+        if date_str not in trend_dict:
+            trend_dict[date_str] = 0
+            max_mag_by_date[date_str] = 0
+            provinces_by_date[date_str] = set()
+        
+        trend_dict[date_str] += 1
+        
+        if eq.magnitude > max_mag_by_date[date_str]:
+            max_mag_by_date[date_str] = eq.magnitude
+        
+        city = eq.city
+        if city and city.province:
+            provinces_by_date[date_str].add(city.province.province_name)
+
+    trend_list = []
+    for k, v in sorted(trend_dict.items()):
+        provinces_list = list(provinces_by_date[k])
+        trend_list.append({
+            "date": k,
+            "count": v,
+            "max_mag": max_mag_by_date[k],
+            "provinces": provinces_list[:5]
+        })
+    
     return trend_list
 
 
-# 按震级区间统计 自定义6个震级分段
 def get_magnitude_data(earthquake_list):
     ranges = [
-        ("0-2.9", 0, 2.9),
         ("3.0-3.9", 3.0, 3.9),
         ("4.0-4.9", 4.0, 4.9),
         ("5.0-5.9", 5.0, 5.9),
@@ -330,10 +386,8 @@ def get_magnitude_data(earthquake_list):
 
     magnitude_list = []
     for range_name, min_mag, max_mag in ranges:
-        # 统计地震数量
-        count = sum(1 for eq in earthquake_list if min_mag <= eq.magnitude <= max_mag)
-        # 当前区间所有震级，最大值，平均值
         mags = [eq.magnitude for eq in earthquake_list if min_mag <= eq.magnitude <= max_mag]
+        count = len(mags)
         max_mag_val = max(mags) if mags else 0
         avg_mag_val = sum(mags) / len(mags) if mags else 0
 
@@ -347,38 +401,53 @@ def get_magnitude_data(earthquake_list):
     return magnitude_list
 
 
-# 按省份统计并倒序
 def get_province_data(earthquake_list):
     province_dict = {}
-    # 按省份分组统计
+    max_mag_by_province = {}
+    
     for eq in earthquake_list:
         city = eq.city
         if city and city.province:
             p = city.province
-            province_dict[p.province_id] = {
-                "province_name": p.province_name,
-                "count": province_dict.get(p.province_id, {}).get("count", 0) + 1
-            }
+            pid = p.province_id
+            
+            if pid not in province_dict:
+                province_dict[pid] = {
+                    "province_name": p.province_name,
+                    "count": 0
+                }
+                max_mag_by_province[pid] = 0
+            
+            province_dict[pid]["count"] += 1
+            
+            if eq.magnitude > max_mag_by_province[pid]:
+                max_mag_by_province[pid] = eq.magnitude
 
-    province_list = [{"province_name": v["province_name"], "count": v["count"]}
-                     for v in province_dict.values()]
+    province_list = []
+    for pid, data in province_dict.items():
+        province_list.append({
+            "province_name": data["province_name"],
+            "count": data["count"],
+            "max_mag": max_mag_by_province[pid]
+        })
+    
     province_list.sort(key=lambda x: x["count"], reverse=True)
-
     return province_list
 
 
-# 按城市统计并倒序（新增）
 def get_city_data(earthquake_list):
     city_dict = {}
-    # 按城市分组统计
     for eq in earthquake_list:
         city = eq.city
         if city:
-            city_dict[city.city_id] = {
-                "city_name": city.city_name,
-                "province_name": city.province.province_name if city.province else "未知",
-                "count": city_dict.get(city.city_id, {}).get("count", 0) + 1
-            }
+            cid = city.city_id
+            if cid not in city_dict:
+                city_dict[cid] = {
+                    "city_name": city.city_name,
+                    "province_name": city.province.province_name if city.province else "未知",
+                    "count": 0
+                }
+            city_dict[cid]["count"] += 1
 
     city_list = [{"city_name": v["city_name"], "province_name": v["province_name"], "count": v["count"]}
                  for v in city_dict.values()]
@@ -386,6 +455,101 @@ def get_city_data(earthquake_list):
 
     return city_list
 
+
+def get_summary_with_comparison(earthquake_list, province_id, city_id, start_time, end_time, mag_min, mag_max):
+    total = len(earthquake_list)
+    max_magnitude = max([eq.magnitude for eq in earthquake_list], default=0)
+    avg_magnitude = sum([eq.magnitude for eq in earthquake_list]) / total if total > 0 else 0
+    
+    province_set = set()
+    for eq in earthquake_list:
+        city = eq.city
+        if city and city.province:
+            province_set.add(city.province.province_id)
+    province_count = len(province_set)
+    
+    prev_start = None
+    prev_end = None
+    if start_time and end_time:
+        try:
+            start_dt = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+            end_dt = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
+            delta = end_dt - start_dt
+            prev_end = start_dt
+            prev_start = start_dt - delta
+            
+            prev_query = EarthquakeInfo.query.join(City, EarthquakeInfo.city_id == City.city_id)
+            
+            if province_id:
+                prev_query = prev_query.filter(City.province_id == int(province_id))
+            if city_id:
+                prev_query = prev_query.filter(EarthquakeInfo.city_id == int(city_id))
+            if mag_min > 0:
+                prev_query = prev_query.filter(EarthquakeInfo.magnitude >= mag_min)
+            if mag_max < 99.9:
+                prev_query = prev_query.filter(EarthquakeInfo.magnitude <= mag_max)
+                
+            prev_query = prev_query.filter(
+                and_(
+                    EarthquakeInfo.earthquake_time >= prev_start,
+                    EarthquakeInfo.earthquake_time <= prev_end
+                )
+            )
+            
+            prev_list = prev_query.all()
+            prev_total = len(prev_list)
+            prev_max = max([eq.magnitude for eq in prev_list], default=0)
+            prev_avg = sum([eq.magnitude for eq in prev_list]) / prev_total if prev_total > 0 else 0
+            
+            prev_province_set = set()
+            for eq in prev_list:
+                city = eq.city
+                if city and city.province:
+                    prev_province_set.add(city.province.province_id)
+            prev_province_count = len(prev_province_set)
+            
+            total_compare = ((total - prev_total) / prev_total * 100) if prev_total > 0 else 0
+            max_compare = max_magnitude - prev_max
+            avg_compare = avg_magnitude - prev_avg
+            province_compare = province_count - prev_province_count
+            
+        except Exception as e:
+            total_compare = 0
+            max_compare = 0
+            avg_compare = 0
+            province_compare = 0
+    else:
+        total_compare = 0
+        max_compare = 0
+        avg_compare = 0
+        province_compare = 0
+
+    return {
+        "total": total,
+        "max_magnitude": max_magnitude,
+        "avg_magnitude": round(avg_magnitude, 2),
+        "province_count": province_count,
+        "comparison": {
+            "total_compare": round(total_compare, 1),
+            "max_compare": round(max_compare, 1),
+            "avg_compare": round(avg_compare, 2),
+            "province_compare": province_compare
+        }
+    }
+
+
+def calculate_risk_level(earthquake_list):
+    if not earthquake_list:
+        return {"level": "low", "text": "低风险", "color": "#67C23A"}
+    
+    max_mag = max([eq.magnitude for eq in earthquake_list])
+    
+    if max_mag >= 6.0:
+        return {"level": "high", "text": "高风险", "color": "#F56C6C"}
+    elif max_mag >= 5.0:
+        return {"level": "medium", "text": "中等风险", "color": "#E6A23C"}
+    else:
+        return {"level": "low", "text": "低风险", "color": "#67C23A"}
 
 # 震级分布统计（柱状图）
 def svc_earthquake_stats_magnitude():

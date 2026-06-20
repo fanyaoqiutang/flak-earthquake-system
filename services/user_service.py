@@ -3,6 +3,7 @@ from flask_login import login_user, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 import secrets
 import datetime as dt
+import re
 from models import db, User, UserSubscribeProvince, UserEarthquakeAlert, Province, EarthquakeInfo, UserFeedback, \
     ChatMessage, City
 
@@ -66,8 +67,114 @@ def svc_user_logout():
 
 
 def svc_user_info():
-    return jsonify({"code": 200, "data": {"user_id": current_user.user_id, "user_account": current_user.user_account}})
+    user_id = None
+    if current_user.is_authenticated:
+        user_id = current_user.user_id
+    else:
+        user_id = session.get('user_id')
+    
+    if not user_id:
+        return jsonify({"code": 401, "msg": "请先登录"}), 401
+    
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"code": 404, "msg": "用户不存在"}), 404
+    
+    return jsonify({
+        "code": 200, 
+        "data": {
+            "user_id": user.user_id,
+            "user_account": user.user_account,
+            "email": getattr(user, 'email', '') or "",
+            "avatar": getattr(user, 'avatar', '') or "",
+            "nickname": getattr(user, 'nickname', user.user_account) or user.user_account,
+            "create_time": user.create_time.strftime("%Y-%m-%d %H:%M:%S") if user.create_time else "",
+            "status": user.status
+        }
+    })
 
+
+def svc_update_user_info(user_id, data):
+    """更新用户基础信息"""
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"code": 404, "msg": "用户不存在"}), 404
+
+    changed = False
+    
+    if "nickname" in data and data["nickname"]:
+        nickname = data["nickname"].strip()
+        if len(nickname) < 1 or len(nickname) > 12:
+            return jsonify({"code": 400, "msg": "昵称长度1-12个字符"}), 400
+        if nickname != user.nickname:
+            user.nickname = nickname
+            changed = True
+    
+    if "email" in data:
+        email = data["email"].strip()
+        if email:
+            email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+            if not re.match(email_pattern, email):
+                return jsonify({"code": 400, "msg": "邮箱格式不正确"}), 400
+        if email != getattr(user, 'email', ''):
+            setattr(user, 'email', email if email else None)
+            changed = True
+    
+    if "avatar" in data:
+        avatar = data["avatar"]
+        if avatar != getattr(user, 'avatar', ''):
+            setattr(user, 'avatar', avatar)
+            changed = True
+    
+    if "alert_methods" in data:
+        valid_methods = ["弹窗提醒", "邮件通知"]
+        methods = [m for m in data["alert_methods"] if m in valid_methods]
+        if methods != user.alert_methods:
+            user.alert_methods = methods
+            changed = True
+
+    if changed:
+        db.session.commit()
+        return jsonify({"code": 200, "msg": "更新成功"})
+    else:
+        return jsonify({"code": 200, "msg": "无变更内容"})
+
+
+def svc_delete_account(user_id):
+    """注销账号（需要密码验证）"""
+    data = request.get_json() if request.is_json else {}
+    password = data.get("password", "")
+    
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"code": 404, "msg": "用户不存在"}), 404
+    
+    if user.status == "已注销":
+        return jsonify({"code": 400, "msg": "账号已注销"}), 400
+    
+    create_days = (dt.datetime.now() - user.create_time).days if user.create_time else 0
+    if create_days < 7:
+        return jsonify({"code": 400, "msg": "注册不足7天，暂不能注销账号"}), 400
+    
+    pending_feedback = UserFeedback.query.filter_by(user_id=user_id, status="未处理").count()
+    if pending_feedback > 0:
+        return jsonify({"code": 400, "msg": f"有{pending_feedback}条未处理的反馈，处理完成后可注销"}), 400
+    
+    if not password:
+        return jsonify({"code": 400, "msg": "请输入密码验证身份"}), 400
+    
+    if not check_password_hash(user.password, password):
+        return jsonify({"code": 401, "msg": "密码验证失败"}), 401
+    
+    UserSubscribeProvince.query.filter_by(user_id=user_id).delete()
+    UserEarthquakeAlert.query.filter_by(user_id=user_id).delete()
+    ChatMessage.query.filter_by(user_id=user_id).delete()
+    
+    user.status = "已注销"
+    setattr(user, 'email', None)
+    db.session.commit()
+
+    return jsonify({"code": 200, "msg": "账号已注销"})
 
 # ====================== 订阅 ======================
 def svc_subscribe_province():
@@ -344,53 +451,3 @@ def svc_get_chat_list():
         })
 
     return jsonify({"code": 200, "data": res})
-
-
-def svc_update_user_info(user_id, data):
-    """更新用户基础信息"""
-    user = User.query.get(user_id)
-    if not user:
-        return jsonify({"code": 404, "msg": "用户不存在"}), 404
-
-    # 更新字段（只保留实际存在的字段）
-    if "phone" in data:
-        user.phone = data["phone"]
-
-    db.session.commit()
-    return jsonify({"code": 200, "msg": "更新成功"})
-
-
-def svc_change_password(user_id, data):
-    """修改密码"""
-    user = User.query.get(user_id)
-    if not user:
-        return jsonify({"code": 404, "msg": "用户不存在"}), 404
-
-    old_password = data.get("old_password", "")
-    new_password = data.get("new_password", "")
-
-    if not old_password or not new_password:
-        return jsonify({"code": 400, "msg": "旧密码和新密码不能为空"}), 400
-
-    # 验证旧密码
-    if not check_password_hash(user.password, old_password):
-        return jsonify({"code": 401, "msg": "旧密码错误"}), 401
-
-    # 更新密码
-    user.set_password(new_password)
-    db.session.commit()
-
-    return jsonify({"code": 200, "msg": "密码修改成功"})
-
-
-def svc_delete_account(user_id):
-    """注销账号（软删除）"""
-    user = User.query.get(user_id)
-    if not user:
-        return jsonify({"code": 404, "msg": "用户不存在"}), 404
-
-    # 软删除：将状态设置为已注销
-    user.status = "已注销"
-    db.session.commit()
-
-    return jsonify({"code": 200, "msg": "账号已注销"})

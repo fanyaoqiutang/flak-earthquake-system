@@ -1,5 +1,6 @@
 from flask import Blueprint, request
 from services.common_service import svc_list_earthquake, svc_earthquake_stats_province, svc_earthquake_stats_city, svc_earthquake_stats_trend, svc_earthquake_stats_magnitude, svc_earthquake_rank, svc_earthquake_city_rank, svc_get_provinces_group_by_region, svc_get_all_provinces, svc_earthquake_statistics, svc_get_all_cities, svc_ai_chat
+from websocket_service import check_and_push_earthquake_alert
 
 common_bp = Blueprint("common", __name__, url_prefix="/api")
 
@@ -71,3 +72,35 @@ def earthquake_statistics():
 def ai_chat():
     """AI智能问答接口"""
     return svc_ai_chat()
+
+
+@common_bp.route("/earthquake/add", methods=["POST"])
+def add_earthquake():
+    """管理员新增地震数据（需要实现此接口）"""
+    from services.admin_service import verify_admin
+    from models import db, EarthquakeInfo, City
+    
+    if not verify_admin():
+        return jsonify({"code": 403, "msg": "无权限"}), 403
+    
+    data = request.get_json()
+    
+    try:
+        eq = EarthquakeInfo(
+            city_id=data['city_id'],
+            earthquake_time=data['earthquake_time'],
+            latitude=data['latitude'],
+            longitude=data['longitude'],
+            depth=data['depth'],
+            magnitude=data['magnitude'],
+            earthquake_message=data.get('earthquake_message', '')
+        )
+        db.session.add(eq)
+        db.session.commit()
+        
+        check_and_push_earthquake_alert(eq.earthquake_id)
+        
+        return jsonify({"code": 200, "msg": "添加成功", "data": {"earthquake_id": eq.earthquake_id}})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"code": 500, "msg": f"添加失败: {str(e)}"}), 500
