@@ -135,6 +135,23 @@ def admin_send_chat():
 def chat_list():
     return svc_get_chat_list()
 
+
+# ====================== 获取当前用户发送的聊天消息 ======================
+@user_bp.route("/chat/my-messages", methods=["GET"])
+@login_required
+def get_my_chat_messages():
+    user_id = current_user.user_id
+    return svc_get_user_chat_messages(user_id)
+
+
+# ====================== 删除用户发送的聊天消息 ======================
+@user_bp.route("/chat/my-messages/<int:message_id>", methods=["DELETE"])
+@login_required
+def delete_my_chat_message(message_id):
+    user_id = current_user.user_id
+    return svc_delete_user_chat_message(user_id, message_id)
+
+
 # 获取全部省份列表
 @user_bp.route("/provinces", methods=["GET"])
 def get_all_province():

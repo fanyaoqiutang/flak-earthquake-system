@@ -4,6 +4,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import secrets
 import datetime as dt
 import re
+from sqlalchemy import desc
 from models import db, User, UserSubscribeProvince, UserEarthquakeAlert, Province, EarthquakeInfo, UserFeedback, \
     ChatMessage, City
 
@@ -451,3 +452,41 @@ def svc_get_chat_list():
         })
 
     return jsonify({"code": 200, "data": res})
+
+
+# ====================== 获取当前用户发送的聊天消息 ======================
+def svc_get_user_chat_messages(user_id):
+    """获取当前用户发送的所有聊天消息"""
+    messages = ChatMessage.query.filter_by(user_id=user_id).order_by(desc(ChatMessage.create_time)).all()
+    res = []
+
+    for m in messages:
+        res.append({
+            "id": m.id,
+            "content": m.content,
+            "send_time": m.create_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "status": m.status if hasattr(m, 'status') else 'normal'
+        })
+
+    return jsonify({"code": 200, "data": res})
+
+
+# ====================== 删除用户发送的聊天消息 ======================
+def svc_delete_user_chat_message(user_id, message_id):
+    """删除用户自己发送的消息"""
+    msg = ChatMessage.query.get(message_id)
+    
+    if not msg:
+        return jsonify({"code": 404, "msg": "消息不存在"}), 404
+    
+    # 验证消息是否属于当前用户
+    if msg.user_id != user_id:
+        return jsonify({"code": 403, "msg": "无权删除此消息"}), 403
+    
+    try:
+        db.session.delete(msg)
+        db.session.commit()
+        return jsonify({"code": 200, "msg": "删除成功"})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"code": 500, "msg": f"删除失败: {str(e)}"}), 500

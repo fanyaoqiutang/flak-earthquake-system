@@ -1,25 +1,5 @@
 <template>
   <div class="home-container">
-    <!-- 统计卡片 -->
-    <div class="stats-row">
-      <div class="stat-item">
-        <div class="stat-num">{{ earthquakeData.length }}</div>
-        <div class="stat-text">今日地震次数</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-num">{{ maxMagnitude }}</div>
-        <div class="stat-text">最大震级（级）</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-num">{{ filteredEarthquakes.length }}</div>
-        <div class="stat-text">筛选结果</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-num status-normal">正常</div>
-        <div class="stat-text">系统状态</div>
-      </div>
-    </div>
-
     <!-- 筛选栏 -->
     <div class="filter-bar">
       <div class="filter-group">
@@ -72,6 +52,29 @@
         </div>
       </div>
       <button class="reset-btn" @click="resetFilter">重置筛选</button>
+
+      <!-- 统计信息内联显示 -->
+      <div class="stats-inline">
+        <div class="stat-item-inline">
+          <span class="stat-value">{{ earthquakeData.length }}</span>
+          <span class="stat-label">今日地震次数</span>
+        </div>
+        <div class="divider"></div>
+        <div class="stat-item-inline">
+          <span class="stat-value">{{ maxMagnitude }}</span>
+          <span class="stat-label">最大震级（级）</span>
+        </div>
+        <div class="divider"></div>
+        <div class="stat-item-inline">
+          <span class="stat-value">{{ filteredEarthquakes.length }}</span>
+          <span class="stat-label">筛选结果</span>
+        </div>
+        <div class="divider"></div>
+        <div class="stat-item-inline">
+          <span class="stat-value status-normal">正常</span>
+          <span class="stat-label">系统状态</span>
+        </div>
+      </div>
     </div>
 
     <!-- 两栏布局 -->
@@ -94,22 +97,100 @@
               </div>
               <div class="simple-time">{{ item.time }}</div>
               <div class="simple-info">深度：{{ item.depth }}km | 坐标：{{ item.lat }}°N, {{ item.lng }}°E</div>
-              <a href="#" class="detail-link">查看详情 ></a>
+              <a href="#" class="detail-link" @click.prevent="showDetail(item)">查看详情 ></a>
             </div>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- 地震详情弹窗 -->
+    <el-dialog
+      v-model="detailVisible"
+      title="地震详细信息"
+      width="600px"
+      :close-on-click-modal="true"
+    >
+      <div v-if="selectedEarthquake" class="earthquake-detail">
+        <div class="detail-header">
+          <span class="detail-magnitude" :class="getMagClass(selectedEarthquake.magnitude)">
+            M {{ selectedEarthquake.magnitude }}
+          </span>
+          <span class="detail-location">{{ selectedEarthquake.province }} {{ selectedEarthquake.city }}</span>
+        </div>
+
+        <el-divider />
+
+        <div class="detail-info">
+          <div class="info-row">
+            <span class="info-label">发生时间：</span>
+            <span class="info-value">{{ selectedEarthquake.time }}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">震源深度：</span>
+            <span class="info-value">{{ selectedEarthquake.depth }} km</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">震中坐标：</span>
+            <span class="info-value">{{ selectedEarthquake.lat }}°N, {{ selectedEarthquake.lng }}°E</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">震级：</span>
+            <span class="info-value" :class="getMagClass(selectedEarthquake.magnitude)">
+              {{ selectedEarthquake.magnitude }} 级
+            </span>
+          </div>
+        </div>
+
+        <el-divider />
+
+        <div class="detail-tips">
+          <el-alert
+            title="防震提示"
+            type="warning"
+            :closable="false"
+            show-icon
+          >
+            <template #default>
+              <ul>
+                <li>保持冷静，迅速躲避到坚固的桌子下或墙角</li>
+                <li>远离窗户、玻璃、吊灯等易碎物品</li>
+                <li>地震停止后，有序撤离到空旷地带</li>
+                <li>不要使用电梯，走楼梯撤离</li>
+              </ul>
+            </template>
+          </el-alert>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button size="large" @click="detailVisible = false" class="btn-close">
+            <el-icon><Close /></el-icon>
+            关闭
+          </el-button>
+          <el-button type="primary" size="large" @click="viewOnMap" class="btn-map">
+            <el-icon><Location /></el-icon>
+            在地图上查看
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { getEarthquakeList, getProvinces, getCities } from '../API/common'
+import { Close, Location } from '@element-plus/icons-vue'
 
 const timeFilter = ref('1y')
 const magFilter = ref('0')
 const mapContainer = ref(null)
+
+// 地震详情弹窗
+const detailVisible = ref(false)
+const selectedEarthquake = ref(null)
 
 // 省市筛选
 const selectedProvinceId = ref(null)
@@ -199,11 +280,11 @@ const loadEarthquakeData = async () => {
     }
 
     if (selectedProvinceId.value) {
-      params.province_id = selectedProvinceId.value
+      params.province_id = selectedProvinceId
     }
 
     if (selectedCityId.value) {
-      params.city_id = selectedCityId.value
+      params.city_id = selectedCityId
     }
 
     const response = await getEarthquakeList(params)
@@ -304,6 +385,22 @@ watch(filteredEarthquakes, () => {
   if (map) addMarkers()
 })
 
+// 显示地震详情
+const showDetail = (earthquake) => {
+  selectedEarthquake.value = earthquake
+  detailVisible.value = true
+}
+
+// 在地图上查看
+const viewOnMap = () => {
+  if (!selectedEarthquake.value || !map) return
+
+  const { lng, lat } = selectedEarthquake.value
+  map.setCenter([lng, lat])
+  map.setZoom(10)
+  detailVisible.value = false
+}
+
 onMounted(() => {
   loadProvinces()
   loadEarthquakeData()
@@ -331,39 +428,6 @@ onBeforeUnmount(() => {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
-/* 统计卡片 */
-.stats-row {
-  display: flex;
-  gap: 1px;
-  background: #E8ECF0;
-  margin: 20px 40px;
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.stat-item {
-  background: white;
-  flex: 1;
-  padding: 12px 16px;
-  text-align: center;
-}
-
-.stat-num {
-  font-size: 24px;
-  font-weight: 600;
-  color: #1E293B;
-  margin-bottom: 4px;
-}
-
-.stat-text {
-  font-size: 12px;
-  color: #8A99B0;
-}
-
-.status-normal {
-  color: #10B981;
-}
-
 /* 筛选栏 */
 .filter-bar {
   background: white;
@@ -373,8 +437,8 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 20px;
-  margin: 0 40px 20px;
   flex-wrap: wrap;
+  margin: 20px 40px;
 }
 
 .filter-group {
@@ -410,15 +474,57 @@ onBeforeUnmount(() => {
 }
 
 .reset-btn {
-  margin-left: auto;
   background: none;
   border: none;
   font-size: 13px;
   color: #64748B;
   cursor: pointer;
+  padding: 4px 0;
 }
 
-/* 两栏布局（地图占比更大，侧边栏更窄） */
+.reset-btn:hover {
+  color: #1677ff;
+}
+
+/* 统计信息内联样式 */
+.stats-inline {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-left: auto;
+  padding-left: 20px;
+  border-left: 1px solid #E8ECF0;
+}
+
+.stat-item-inline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.stat-value {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1E293B;
+}
+
+.stat-label {
+  font-size: 11px;
+  color: #8A99B0;
+}
+
+.status-normal {
+  color: #10B981;
+}
+
+.divider {
+  width: 1px;
+  height: 30px;
+  background: #E8ECF0;
+}
+
+/* 两栏布局 */
 .two-columns {
   display: flex;
   gap: 20px;
@@ -426,7 +532,7 @@ onBeforeUnmount(() => {
 }
 
 .left-col {
-  flex: 4;
+  flex: 5;
 }
 
 .right-col {
@@ -442,9 +548,9 @@ onBeforeUnmount(() => {
 }
 
 .map-box {
-  height: 600px;
+  height: 700px;
   background: #F0F4FA;
-  border-radius: 8px;
+  border-radius: 8;
   overflow: hidden;
   border: 1px solid #E8ECF0;
 }
@@ -520,13 +626,165 @@ onBeforeUnmount(() => {
   font-size: 12px;
   color: #1677ff;
   text-decoration: none;
+  cursor: pointer;
+}
+
+.detail-link:hover {
+  text-decoration: underline;
+}
+
+/* 地震详情弹窗样式 */
+.earthquake-detail {
+  padding: 10px 0;
+}
+
+.detail-header {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 10px;
+}
+
+.detail-magnitude {
+  font-size: 32px;
+  font-weight: bold;
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: #f0f2f5;
+}
+
+.detail-magnitude.high {
+  color: #DC2626;
+  background: #FEF2F2;
+}
+
+.detail-magnitude.medium {
+  color: #F59E0B;
+  background: #FFFBEB;
+}
+
+.detail-magnitude.low {
+  color: #10B981;
+  background: #ECFDF5;
+}
+
+.detail-location {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1E293B;
+}
+
+.detail-info {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f2f5;
+}
+
+.info-row:last-child {
+  border-bottom: none;
+}
+
+.info-label {
+  font-size: 14px;
+  color: #64748B;
+}
+
+.info-value {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1E293B;
+}
+
+.info-value.high {
+  color: #DC2626;
+}
+
+.info-value.medium {
+  color: #F59E0B;
+}
+
+.info-value.low {
+  color: #10B981;
+}
+
+.detail-tips ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.detail-tips li {
+  margin-bottom: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 弹窗底部按钮样式 */
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 10px;
+}
+
+.btn-close {
+  min-width: 100px;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.btn-close:hover {
+  background: #f5f7fa;
+  border-color: #c0c4cc;
+  transform: translateY(-1px);
+}
+
+.btn-map {
+  min-width: 140px;
+  border-radius: 6px;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.3);
+  transition: all 0.3s;
+}
+
+.btn-map:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.4);
+}
+
+.btn-map .el-icon {
+  margin-right: 6px;
 }
 
 /* 响应式 */
 @media (max-width: 1200px) {
+  .filter-bar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .stats-inline {
+    margin-left: 0;
+    padding-left: 0;
+    border-left: none;
+    border-top: 1px solid #E8ECF0;
+    padding-top: 12px;
+    margin-top: 12px;
+    width: 100%;
+    justify-content: space-around;
+  }
+
   .two-columns {
     flex-direction: column;
   }
+
   .map-box {
     height: 450px;
   }

@@ -152,6 +152,22 @@ export function getChatList() {
   })
 }
 
+// 获取当前用户发送的聊天消息
+export function getUserChatMessages() {
+  return request({
+    url: '/user/chat/my-messages',
+    method: 'get'
+  })
+}
+
+// 删除用户发送的聊天消息
+export function deleteUserChatMessage(messageId) {
+  return request({
+    url: `/user/chat/my-messages/${messageId}`,
+    method: 'delete'
+  })
+}
+
 
 // 更新用户基础信息
 export function updateUserInfo(data) {
@@ -172,10 +188,11 @@ export function changePassword(data) {
 }
 
 // 注销账号
-export function deleteAccount() {
+export function deleteAccount(data) {
   return request({
     url: '/user/account/delete',
-    method: 'delete'
+    method: 'delete',
+    data
   })
 }
 

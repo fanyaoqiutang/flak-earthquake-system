@@ -16,6 +16,10 @@
               <el-icon><Bell /></el-icon>
               <span>订阅管理</span>
             </el-menu-item>
+            <el-menu-item index="feedback">
+              <el-icon><Document /></el-icon>
+              <span>意见反馈</span>
+            </el-menu-item>
             <el-menu-item index="messages">
               <el-icon><ChatDotRound /></el-icon>
               <span>消息中心</span>
@@ -38,6 +42,7 @@
             </el-empty>
           </div>
 
+          <!-- ============ 基础信息 ============ -->
           <div v-show="activeMenu === 'basic' && !loadError" class="content-section">
             <el-alert
               title="为保障预警账号安全，建议绑定常用邮箱，接收地震紧急推送。"
@@ -111,6 +116,7 @@
             </el-form>
           </div>
 
+          <!-- ============ 账号安全 ============ -->
           <div v-show="activeMenu === 'security' && !loadError" class="content-section">
             <el-alert
               title="为保障预警账号安全，建议定期更换密码，绑定常用邮箱，接收地震紧急推送。"
@@ -188,6 +194,7 @@
             </el-form>
           </div>
 
+          <!-- ============ 订阅管理 ============ -->
           <div v-show="activeMenu === 'subscription'" class="content-section">
             <h3>订阅的省份</h3>
             <el-table :data="subscriptions" style="width: 100%">
@@ -233,31 +240,99 @@
             </el-form>
           </div>
 
-          <div v-show="activeMenu === 'messages'" class="content-section">
-            <div class="message-header">
-              <span>预警通知</span>
-              <el-button type="primary" size="small" @click="markAllRead">全部标记已读</el-button>
-            </div>
+          <!-- ============ 意见反馈 ============ -->
+          <div v-show="activeMenu === 'feedback'" class="content-section">
+            <el-alert
+              title="若遇到地震预警异常、订阅故障、功能BUG可提交反馈，工作人员会尽快处理"
+              type="info"
+              show-icon
+              :closable="false"
+              style="margin-bottom:20px"
+            />
 
-            <el-table :data="messages" style="width: 100%">
-              <el-table-column prop="title" label="标题" />
-              <el-table-column prop="content" label="内容" />
-              <el-table-column prop="create_time" label="时间" width="180" />
-              <el-table-column prop="is_read" label="状态" width="80">
-                <template #default="{ row }">
-                  <el-tag :type="row.is_read ? 'info' : 'danger'" size="small">
-                    {{ row.is_read ? '已读' : '未读' }}
-                  </el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column label="操作" width="100">
-                <template #default="{ row }">
-                  <el-button v-if="!row.is_read" type="primary" size="small" @click="markRead(row.id)">
-                    标记已读
-                  </el-button>
-                </template>
-              </el-table-column>
-            </el-table>
+            <el-form :model="feedbackForm" label-width="100px" ref="feedbackRef" :rules="feedbackRules">
+              <el-form-item label="反馈类型" prop="feedback_type">
+                <el-select v-model="feedbackForm.feedback_type" placeholder="请选择反馈类型">
+                  <el-option label="功能BUG" value="BUG"/>
+                  <el-option label="功能建议" value="建议"/>
+                  <el-option label="预警异常" value="预警问题"/>
+                  <el-option label="其他问题" value="其他"/>
+                </el-select>
+              </el-form-item>
+
+              <el-form-item label="紧急程度" prop="priority">
+                <el-radio-group v-model="feedbackForm.priority">
+                  <el-radio label="低"/>
+                  <el-radio label="中"/>
+                  <el-radio label="高"/>
+                </el-radio-group>
+              </el-form-item>
+
+              <el-form-item label="详细描述" prop="content">
+                <el-input v-model="feedbackForm.content" type="textarea" :rows="5" placeholder="请详细描述你遇到的问题或建议"/>
+              </el-form-item>
+
+              <el-form-item>
+                <el-button type="primary" @click="handleSubmitFeedback" :loading="feedbackLoading">提交反馈</el-button>
+                <el-button @click="resetFeedback">重置</el-button>
+              </el-form-item>
+            </el-form>
+          </div>
+
+          <!-- ============ 消息中心 ============ -->
+          <div v-show="activeMenu === 'messages'" class="content-section">
+            <el-tabs v-model="messageTab" class="message-tabs">
+              <!-- 历史地震预警记录 -->
+              <el-tab-pane label="历史地震预警记录" name="alerts">
+                <div class="message-header">
+                  <span></span>
+                  <el-button type="primary" size="small" @click="markAllRead">全部标记已读</el-button>
+                </div>
+
+                <el-table :data="alertMessages" style="width: 100%" v-if="alertMessages.length > 0">
+                  <el-table-column prop="title" label="标题" />
+                  <el-table-column prop="content" label="内容" show-overflow-tooltip />
+                  <el-table-column prop="create_time" label="时间" width="180" />
+                  <el-table-column prop="is_read" label="状态" width="80">
+                    <template #default="{ row }">
+                      <el-tag :type="row.is_read ? 'info' : 'danger'" size="small">
+                        {{ row.is_read ? '已读' : '未读' }}
+                      </el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="操作" width="100">
+                    <template #default="{ row }">
+                      <el-button v-if="!row.is_read" type="primary" size="small" @click="markRead(row.id)">
+                        标记已读
+                      </el-button>
+                    </template>
+                  </el-table-column>
+                </el-table>
+
+                <el-empty v-else description="暂无预警通知" />
+              </el-tab-pane>
+
+              <!-- 我的消息 -->
+              <el-tab-pane label="我的消息" name="my-messages">
+                <div class="message-header">
+                  <span></span>
+                </div>
+
+                <el-table :data="myChatMessages" style="width: 100%" v-if="myChatMessages.length > 0">
+                  <el-table-column prop="content" label="消息内容" show-overflow-tooltip />
+                  <el-table-column prop="send_time" label="发送时间" width="180" />
+                  <el-table-column label="操作" width="100">
+                    <template #default="{ row }">
+                      <el-button type="danger" size="small" @click="deleteMyMessage(row.id)">
+                        删除
+                      </el-button>
+                    </template>
+                  </el-table-column>
+                </el-table>
+
+                <el-empty v-else description="暂无发送的消息" />
+              </el-tab-pane>
+            </el-tabs>
           </div>
         </el-card>
       </el-col>
@@ -266,10 +341,11 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { User, Lock, Bell, ChatDotRound, Camera } from '@element-plus/icons-vue'
+import { User, Lock, Bell, ChatDotRound, Camera, Document } from '@element-plus/icons-vue'
+
 import {
   getUserInfo,
   updateUserInfo,
@@ -281,27 +357,36 @@ import {
   markAlertRead,
   markAllAlertsRead,
   getAlertSettings,
-  updateAlertSettings
+  updateAlertSettings,
+  submitFeedback,
+  getUserChatMessages,
+  deleteUserChatMessage
 } from '../API/user'
 
 const router = useRouter()
 
+// ===================== 基础状态 =====================
 const activeMenu = ref('basic')
 const loading = ref(false)
 const loadError = ref(false)
 const savingBasic = ref(false)
 const changingPassword = ref(false)
+const feedbackLoading = ref(false)
+const emailCountdown = ref(0)
+const messageTab = ref('alerts')
 
 const menuTitle = computed(() => {
   const titles = {
     basic: '基础信息',
     security: '账号安全',
     subscription: '订阅管理',
+    feedback: '意见反馈',
     messages: '消息中心'
   }
   return titles[activeMenu.value]
 })
 
+// ===================== 基础信息 =====================
 const originalData = reactive({
   avatar: '',
   nickname: '',
@@ -328,6 +413,26 @@ const basicRules = {
   ]
 }
 
+const hasBasicChanges = computed(() => {
+  return (
+    basicForm.avatar !== originalData.avatar ||
+    basicForm.nickname !== originalData.nickname ||
+    basicForm.email !== originalData.email ||
+    JSON.stringify(basicForm.alertMethods) !== JSON.stringify(originalData.alertMethods)
+  )
+})
+
+const avatarInitial = computed(() => {
+  if (basicForm.nickname) {
+    return basicForm.nickname.charAt(0).toUpperCase()
+  }
+  return 'U'
+})
+
+const defaultAvatarUrl = computed(() => '/default-avatar.png')
+const originalAvatar = computed(() => originalData.avatar)
+
+// ===================== 账号安全 =====================
 const securityForm = reactive({
   oldPassword: '',
   newPassword: '',
@@ -377,15 +482,15 @@ const canChangePassword = computed(() => {
          passwordStrength.value !== 'weak'
 })
 
+// ===================== 邮箱绑定 =====================
 const emailForm = reactive({
   email: '',
   code: ''
 })
 
-const emailCountdown = ref(0)
-
+// ===================== 订阅管理 =====================
 const subscriptions = ref([])
-const messages = ref([])
+
 const alertSettings = reactive({
   frequency: '实时预警',
   methods: ['弹窗提醒'],
@@ -393,41 +498,38 @@ const alertSettings = reactive({
   magnitudeThreshold: 3.0
 })
 
-const hasBasicChanges = computed(() => {
-  return (
-    basicForm.avatar !== originalData.avatar ||
-    basicForm.nickname !== originalData.nickname ||
-    basicForm.email !== originalData.email ||
-    JSON.stringify(basicForm.alertMethods) !== JSON.stringify(originalData.alertMethods)
-  )
+// ===================== 消息中心 =====================
+const alertMessages = ref([])
+const myChatMessages = ref([])
+
+// ===================== 意见反馈 =====================
+const feedbackRef = ref(null)
+const feedbackForm = reactive({
+  feedback_type: '',
+  priority: '中',
+  content: ''
 })
 
-const avatarInitial = computed(() => {
-  if (basicForm.nickname) {
-    return basicForm.nickname.charAt(0).toUpperCase()
-  }
-  return 'U'
-})
+const feedbackRules = {
+  feedback_type: [{ required: true, message: '请选择反馈类型', trigger: 'change' }],
+  content: [{ required: true, message: '请填写反馈内容', trigger: 'blur' }]
+}
 
-const defaultAvatarUrl = computed(() => {
-  return '/default-avatar.png'
-})
-
-const originalAvatar = computed(() => {
-  return originalData.avatar
-})
-
+// ===================== 生命周期 =====================
 onMounted(() => {
   loadUserInfo()
   loadSubscriptions()
-  loadMessages()
+  loadAlertMessages()
+  loadMyChatMessages()
   loadAlertSettings()
 })
 
+// ===================== 菜单切换 =====================
 const handleMenuSelect = (index) => {
   activeMenu.value = index
 }
 
+// ===================== 基础信息方法 =====================
 const loadUserInfo = async () => {
   loading.value = true
   loadError.value = false
@@ -500,9 +602,7 @@ const resetAvatar = () => {
 }
 
 const saveBasicInfo = async () => {
-  if (!validateNickname()) {
-    return
-  }
+  if (!validateNickname()) return
 
   savingBasic.value = true
   try {
@@ -557,6 +657,7 @@ const resetBasicForm = () => {
   ElMessage.info('已重置为原始数据')
 }
 
+// ===================== 账号安全方法 =====================
 const checkPasswordStrength = () => {
   const password = securityForm.newPassword
   if (!password) {
@@ -651,6 +752,7 @@ const showDeleteConfirm = () => {
   }).catch(() => {})
 }
 
+// ===================== 邮箱绑定方法 =====================
 const sendEmailCode = () => {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailForm.email)) {
     ElMessage.error('邮箱格式不正确')
@@ -680,6 +782,7 @@ const bindEmail = () => {
   emailForm.code = ''
 }
 
+// ===================== 订阅管理方法 =====================
 const loadSubscriptions = async () => {
   try {
     const response = await getSubscriptions()
@@ -688,32 +791,6 @@ const loadSubscriptions = async () => {
     }
   } catch (error) {
     console.error('加载订阅失败:', error)
-  }
-}
-
-const loadMessages = async () => {
-  try {
-    const response = await getAlerts()
-    if (response.code === 200) {
-      messages.value = response.data
-    }
-  } catch (error) {
-    console.error('加载消息失败:', error)
-  }
-}
-
-const loadAlertSettings = async () => {
-  try {
-    const response = await getAlertSettings()
-    if (response.code === 200) {
-      const data = response.data
-      alertSettings.frequency = data.frequency || '实时预警'
-      alertSettings.methods = data.methods || ['弹窗提醒']
-      alertSettings.soundEnabled = data.sound_enabled ?? true
-      alertSettings.magnitudeThreshold = data.magnitude_threshold || 3.0
-    }
-  } catch (error) {
-    console.error('加载预警设置失败:', error)
   }
 }
 
@@ -726,6 +803,22 @@ const cancelSubscription = async (id) => {
     }
   } catch (error) {
     console.error('取消订阅失败:', error)
+  }
+}
+
+// ===================== 预警设置方法 =====================
+const loadAlertSettings = async () => {
+  try {
+    const response = await getAlertSettings()
+    if (response.code === 200) {
+      const data = response.data
+      alertSettings.frequency = data.frequency || '实时预警'
+      alertSettings.methods = data.methods || ['弹窗提醒']
+      alertSettings.soundEnabled = data.sound_enabled ?? true
+      alertSettings.magnitudeThreshold = data.magnitude_threshold || 3.0
+    }
+  } catch (error) {
+    console.error('加载预警设置失败:', error)
   }
 }
 
@@ -745,12 +838,70 @@ const saveAlertSettings = async () => {
   }
 }
 
+// ===================== 消息中心方法 =====================
+const loadAlertMessages = async () => {
+  try {
+    const response = await getAlerts()
+    if (response.code === 200) {
+      alertMessages.value = response.data.map(item => ({
+        id: item.id,
+        title: item.title || `地震预警 - M${item.magnitude || '未知'}`,
+        content: item.content || `${item.province_name || ''}${item.city_name || ''}发生${item.magnitude || ''}级地震`,
+        create_time: item.create_time,
+        is_read: item.is_read
+      }))
+    }
+  } catch (error) {
+    console.error('加载预警消息失败:', error)
+  }
+}
+
+const loadMyChatMessages = async () => {
+  try {
+    const response = await getUserChatMessages()
+    if (response.code === 200) {
+      myChatMessages.value = response.data || []
+    } else {
+      console.error('加载我的消息失败:', response.msg)
+    }
+  } catch (error) {
+    console.error('加载我的消息失败:', error)
+  }
+}
+
+const deleteMyMessage = async (id) => {
+  try {
+    await ElMessageBox.confirm(
+      '确认删除这条消息吗？',
+      '提示',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+
+    const response = await deleteUserChatMessage(id)
+    if (response.code === 200) {
+      ElMessage.success('删除成功')
+      loadMyChatMessages()
+    } else {
+      ElMessage.error(response.msg || '删除失败')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('删除失败:', error)
+      ElMessage.error('删除失败')
+    }
+  }
+}
+
 const markRead = async (id) => {
   try {
     const response = await markAlertRead(id)
     if (response.code === 200) {
       ElMessage.success('标记成功')
-      loadMessages()
+      loadAlertMessages()
     }
   } catch (error) {
     console.error('标记失败:', error)
@@ -762,11 +913,42 @@ const markAllRead = async () => {
     const response = await markAllAlertsRead()
     if (response.code === 200) {
       ElMessage.success('全部标记成功')
-      loadMessages()
+      loadAlertMessages()
     }
   } catch (error) {
     console.error('标记失败:', error)
   }
+}
+
+// ===================== 意见反馈方法 =====================
+const resetFeedback = () => {
+  feedbackForm.feedback_type = ''
+  feedbackForm.priority = '中'
+  feedbackForm.content = ''
+}
+
+const handleSubmitFeedback = async () => {
+  if (!feedbackRef.value) return
+
+  await feedbackRef.value.validate(async (valid) => {
+    if (!valid) return
+
+    feedbackLoading.value = true
+    try {
+      const res = await submitFeedback(feedbackForm)
+      if (res.code === 200) {
+        ElMessage.success('反馈提交成功，管理员将尽快处理')
+        resetFeedback()
+      } else {
+        ElMessage.error(res.msg)
+      }
+    } catch (err) {
+      console.error('提交反馈报错：', err)
+      ElMessage.error('提交失败，请稍后重试')
+    } finally {
+      feedbackLoading.value = false
+    }
+  })
 }
 </script>
 
@@ -838,6 +1020,26 @@ const markAllRead = async () => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 15px;
+}
+
+.message-tabs {
+  min-height: 400px;
+}
+
+.message-tabs :deep(.el-tabs__header) {
+  font-size: 16px;
+}
+
+.message-tabs :deep(.el-tabs__item) {
+  font-size: 16px;
+  font-weight: 500;
+  padding: 0 30px;
+  height: 50px;
+  line-height: 50px;
+}
+
+.message-tabs :deep(.el-tabs__content) {
+  padding-top: 10px;
 }
 
 .error-state {

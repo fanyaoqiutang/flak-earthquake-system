@@ -87,7 +87,7 @@ import { WarningFilled, InfoFilled, CircleCheck } from '@element-plus/icons-vue'
 import { markAlertRead } from '../API/user'
 
 const visible = ref(false)
-// 新增：标记当前是否已有预警弹窗展示，防止重复弹出双弹窗
+// 标记当前是否已有预警弹窗展示，防止重复弹出双弹窗
 const isAlertShowing = ref(false)
 
 const alertData = ref({

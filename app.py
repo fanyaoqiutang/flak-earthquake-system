@@ -59,7 +59,7 @@ with app.app_context():
     db.create_all()
     from models import Province
     if not Province.query.first():
-        # 👇 我只改了这里：给每个省份自动填上【所属大区 region】
+        # 给每个省份自动填上【所属大区 region】
         provinces = [
             # 华北
             Province(province_name="北京市", region="华北地区"),
