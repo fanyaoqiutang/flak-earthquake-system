@@ -280,11 +280,11 @@ const loadEarthquakeData = async () => {
     }
 
     if (selectedProvinceId.value) {
-      params.province_id = selectedProvinceId
+      params.province_id = selectedProvinceId.value
     }
 
     if (selectedCityId.value) {
-      params.city_id = selectedCityId
+      params.city_id = selectedCityId.value
     }
 
     const response = await getEarthquakeList(params)
