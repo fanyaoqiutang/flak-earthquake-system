@@ -146,38 +146,50 @@
           <el-table :data="provinces" v-loading="loading" style="width: 100%">
             <el-table-column prop="province_id" label="ID" width="80" />
             <el-table-column prop="province_name" label="省份名称" />
-            <el-table-column label="操作" width="200">
+            <el-table-column label="操作" width="120">
               <template #default="{ row }">
-                <el-button type="primary" size="small" @click="handleEditProvince(row)">编辑</el-button>
                 <el-button type="danger" size="small" @click="handleDeleteProvince(row)">删除</el-button>
               </template>
             </el-table-column>
           </el-table>
         </div>
 
-        <div v-if="activeMenu === 'user'">
+       <div v-if="activeMenu === 'user'">
           <div class="section-header">
             <h2>用户管理</h2>
           </div>
           <el-table :data="users" v-loading="loading" style="width: 100%">
             <el-table-column prop="user_id" label="ID" width="80" />
-            <el-table-column prop="username" label="用户名" width="150" />
+            <el-table-column prop="user_account" label="用户名" width="150" />
             <el-table-column prop="phone" label="手机号" width="150" />
             <el-table-column label="订阅省份" width="150">
               <template #default="{ row }">
-                <el-tag v-for="sub in row.subscribed_provinces" :key="sub.province_id" size="small" style="margin-right: 5px; margin-bottom: 5px;">
-                  {{ sub.province_name }}
+                <el-tag v-for="sub in row.subscribed_provinces" :key="sub" size="small" style="margin-right: 5px; margin-bottom: 5px;">
+                  {{ sub }}
                 </el-tag>
               </template>
             </el-table-column>
             <el-table-column label="注册日期" width="150">
               <template #default="{ row }">
-                {{ formatDate(row.created_at) }}
+                {{ formatDate(row.create_time) }}
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="200">
+            <el-table-column prop="status" label="账号状态" width="100">
               <template #default="{ row }">
-                <el-button type="primary" size="small" @click="handleEditUser(row)">编辑</el-button>
+                <el-tag :type="row.status === '正常' ? 'success' : 'danger'">
+                  {{ row.status }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="180">
+              <template #default="{ row }">
+                <el-button
+                  :type="row.status === '正常' ? 'warning' : 'success'"
+                  size="small"
+                  @click="handleToggleStatus(row)"
+                >
+                  {{ row.status === '正常' ? '禁用' : '启用' }}
+                </el-button>
                 <el-button type="danger" size="small" @click="handleDeleteUser(row)">删除</el-button>
               </template>
             </el-table-column>
@@ -253,20 +265,10 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="200">
+            <el-table-column label="操作" width="260">
               <template #default="{ row }">
-                <el-button
-                    v-if="row.status === 'pending'"
-                    type="success"
-                    size="small"
-                    @click="handleResolveFeedback(row)"
-                >标记已解决</el-button>
-                <el-button
-                    v-if="row.status === 'pending'"
-                    type="info"
-                    size="small"
-                    @click="handleIgnoreFeedback(row)"
-                >忽略</el-button>
+                <el-button v-if="row.status === 'pending'" type="success" size="small" @click="handleResolveFeedback(row)">标记已解决</el-button>
+                <el-button v-if="row.status === 'pending'" type="info" size="small" @click="handleIgnoreFeedback(row)">忽略</el-button>
                 <el-button type="danger" size="small" @click="handleDeleteFeedback(row)">删除</el-button>
               </template>
             </el-table-column>
@@ -369,37 +371,6 @@
       </el-card>
     </div>
 
-    <!-- 用户编辑对话框 -->
-    <el-dialog v-model="userDialogVisible" :title="userDialogTitle" width="500px">
-      <el-form :model="editUserForm" label-width="100px">
-        <el-form-item label="用户名">
-          <el-input v-model="editUserForm.username" placeholder="请输入用户名" />
-        </el-form-item>
-        <el-form-item label="手机号">
-          <el-input v-model="editUserForm.phone" placeholder="请输入手机号" />
-        </el-form-item>
-        <el-form-item label="订阅省份">
-          <el-select
-              v-model="editUserForm.subscribed_provinces"
-              multiple
-              placeholder="选择省份"
-              style="width: 100%"
-          >
-            <el-option
-                v-for="province in allProvinces"
-                :key="province.province_id"
-                :label="province.province_name"
-                :value="province.province_id"
-            />
-          </el-select>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="userDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSaveUser">保存</el-button>
-      </template>
-    </el-dialog>
-
     <!-- 省份编辑对话框 -->
     <el-dialog v-model="provinceDialogVisible" :title="provinceDialogTitle" width="400px">
       <el-form :model="editProvinceForm" label-width="100px">
@@ -491,10 +462,11 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getDashboardStats, getAdminInfo, getAllUsers, deleteUser, updateUserInfo, getAllProvinces, deleteProvince, updateProvinceName, addProvince, getFeedbacks, updateFeedbackStatus, getPendingLocations, approveLocation, rejectLocation, batchApproveLocations } from '@/API/admin'
+// 移除updateUserInfo导入
+import { getDashboardStats, getAdminInfo, getAllUsers, deleteUser, toggleUserStatus, getAllProvinces, deleteProvince, updateProvinceName, addProvince, getFeedbacks, updateFeedbackStatus, getPendingLocations, approveLocation, rejectLocation, batchApproveLocations } from '@/API/admin'
 import {
   Monitor,
   Warning,
@@ -502,24 +474,14 @@ import {
   User,
   ChatLineRound,
   ChatDotRound,
-  View,
-  Edit,
-  Delete,
-  Search,
-  ArrowLeft,
-  ArrowRight,
   DocumentChecked
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
 
-// 当前激活的菜单项
 const activeMenu = ref('dashboard')
-
-// 通用加载状态
 const loading = ref(false)
 
-// 仪表盘数据
 const dashboardData = reactive({
   totalUsers: 0,
   todayMessages: 0,
@@ -527,25 +489,16 @@ const dashboardData = reactive({
   pendingFeedbacks: 0,
   pendingLocations: 0
 })
-
 const adminInfo = ref(null)
 
-// 用户管理数据
+// 用户管理（完全移除编辑相关变量）
 const users = ref([])
 const userCurrentPage = ref(1)
 const userPageSize = ref(10)
 const userTotal = ref(0)
-const userDialogVisible = ref(false)
-const userDialogTitle = ref('编辑用户')
-const editUserForm = reactive({
-  user_id: null,
-  username: '',
-  phone: '',
-  subscribed_provinces: []
-})
 const allProvinces = ref([])
 
-// 省份管理数据
+// 省份管理
 const provinces = ref([])
 const provinceDialogVisible = ref(false)
 const provinceDialogTitle = ref('编辑省份')
@@ -584,7 +537,6 @@ const pendingStats = reactive({
   rejected: 0
 })
 
-// 审核对话框
 const auditDialogVisible = ref(false)
 const currentLocation = ref({})
 const approveForm = reactive({
@@ -592,23 +544,19 @@ const approveForm = reactive({
   city_name: ''
 })
 
-// 批量审核对话框
 const batchAuditDialogVisible = ref(false)
 const batchApproveForm = reactive({
   province_id: null
 })
 
-// 示例数据对话框
 const samplesDialogVisible = ref(false)
 
-// 获取仪表盘统计数据
+// 仪表盘
 const fetchDashboardStats = async () => {
   try {
     const response = await getDashboardStats()
     if (response.code === 200) {
       Object.assign(dashboardData, response.data)
-
-      // 获取待审核位置数量
       await fetchPendingLocationsCount()
     } else {
       ElMessage.error(response.message || '获取统计数据失败')
@@ -618,8 +566,6 @@ const fetchDashboardStats = async () => {
     ElMessage.error('获取统计数据失败')
   }
 }
-
-// 获取待审核位置数量
 const fetchPendingLocationsCount = async () => {
   try {
     const response = await getPendingLocations({ page: 1, per_page: 1, status: 'pending' })
@@ -630,8 +576,6 @@ const fetchPendingLocationsCount = async () => {
     console.error('获取待审核位置数量失败:', error)
   }
 }
-
-// 获取管理员信息
 const fetchAdminInfo = async () => {
   try {
     const response = await getAdminInfo()
@@ -650,13 +594,10 @@ const fetchAdminInfo = async () => {
 const fetchUsers = async () => {
   loading.value = true
   try {
-    const response = await getAllUsers({
-      page: userCurrentPage.value,
-      per_page: userPageSize.value
-    })
+    const response = await getAllUsers({})
     if (response.code === 200) {
-      users.value = response.data.items
-      userTotal.value = response.data.total
+      users.value = response.data
+      userTotal.value = response.data.length
     } else {
       ElMessage.error(response.message || '获取用户列表失败')
     }
@@ -665,6 +606,22 @@ const fetchUsers = async () => {
     ElMessage.error('获取用户列表失败')
   } finally {
     loading.value = false
+  }
+}
+
+// 切换用户启用/禁用
+const handleToggleStatus = async (user) => {
+  const text = user.status === "正常" ? "禁用" : "启用"
+  await ElMessageBox.confirm(`确定要${text}用户「${user.user_account}」吗？`, "提示", {
+    type: "warning"
+  })
+  const res = await toggleUserStatus(user.user_id)
+  if (res.code === 200) {
+    ElMessage.success(`${text}成功`)
+    fetchUsers()
+    fetchDashboardStats()
+  } else {
+    ElMessage.error(res.message)
   }
 }
 
@@ -760,8 +717,6 @@ const fetchPendingLocations = async () => {
     if (response.code === 200) {
       pendingLocations.value = response.data.items
       auditTotal.value = response.data.total
-
-      // 更新统计数据
       pendingStats.pending = response.data.stats?.pending || 0
       pendingStats.approved = response.data.stats?.approved || 0
       pendingStats.rejected = response.data.stats?.rejected || 0
@@ -779,10 +734,9 @@ const fetchPendingLocations = async () => {
 // 删除用户
 const handleDeleteUser = async (user) => {
   try {
-    await ElMessageBox.confirm(`确定要删除用户 ${user.username} 吗？`, '警告', {
+    await ElMessageBox.confirm(`确定要删除用户 ${user.user_account} 吗？`, '警告', {
       type: 'warning'
     })
-
     const response = await deleteUser(user.user_id)
     if (response.code === 200) {
       ElMessage.success('删除成功')
@@ -799,52 +753,12 @@ const handleDeleteUser = async (user) => {
   }
 }
 
-// 编辑用户
-const handleEditUser = async (user) => {
-  userDialogTitle.value = '编辑用户'
-  editUserForm.user_id = user.user_id
-  editUserForm.username = user.username
-  editUserForm.phone = user.phone
-  editUserForm.subscribed_provinces = user.subscribed_provinces.map(p => p.province_id)
-
-  // 获取所有省份
-  const response = await getAllProvinces()
-  if (response.code === 200) {
-    allProvinces.value = response.data
-  }
-
-  userDialogVisible.value = true
-}
-
-// 保存用户
-const handleSaveUser = async () => {
-  try {
-    const response = await updateUserInfo(editUserForm.user_id, {
-      username: editUserForm.username,
-      phone: editUserForm.phone,
-      subscribed_provinces: editUserForm.subscribed_provinces
-    })
-
-    if (response.code === 200) {
-      ElMessage.success('保存成功')
-      userDialogVisible.value = false
-      fetchUsers()
-    } else {
-      ElMessage.error(response.message || '保存失败')
-    }
-  } catch (error) {
-    console.error('保存用户失败:', error)
-    ElMessage.error('保存用户失败')
-  }
-}
-
 // 删除省份
 const handleDeleteProvince = async (province) => {
   try {
     await ElMessageBox.confirm(`确定要删除省份 ${province.province_name} 吗？`, '警告', {
       type: 'warning'
     })
-
     const response = await deleteProvince(province.province_id)
     if (response.code === 200) {
       ElMessage.success('删除成功')
@@ -885,7 +799,6 @@ const handleSaveProvince = async () => {
     } else {
       response = await addProvince(editProvinceForm.province_name)
     }
-
     if (response.code === 200) {
       ElMessage.success(editProvinceForm.province_id ? '更新成功' : '添加成功')
       provinceDialogVisible.value = false
@@ -905,12 +818,10 @@ const handleDeleteEarthquake = async (earthquake) => {
     await ElMessageBox.confirm('确定要删除该地震数据吗？', '警告', {
       type: 'warning'
     })
-
     const response = await fetch(`/api/admin/earthquakes/${earthquake.id}`, {
       method: 'DELETE'
     })
     const data = await response.json()
-
     if (data.code === 200) {
       ElMessage.success('删除成功')
       fetchEarthquakes()
@@ -932,12 +843,10 @@ const handleDeleteChat = async (record) => {
     await ElMessageBox.confirm('确定要删除该聊天记录吗？', '警告', {
       type: 'warning'
     })
-
     const response = await fetch(`/api/admin/chat-records/${record.id}`, {
       method: 'DELETE'
     })
     const data = await response.json()
-
     if (data.code === 200) {
       ElMessage.success('删除成功')
       fetchChatRecords()
@@ -993,12 +902,10 @@ const handleDeleteFeedback = async (feedback) => {
     await ElMessageBox.confirm('确定要删除该反馈吗？', '警告', {
       type: 'warning'
     })
-
     const response = await fetch(`/api/admin/feedbacks/${feedback.id}`, {
       method: 'DELETE'
     })
     const data = await response.json()
-
     if (data.code === 200) {
       ElMessage.success('删除成功')
       fetchFeedbacks()
@@ -1019,13 +926,10 @@ const handleApproveLocation = async (location) => {
   currentLocation.value = location
   approveForm.province_id = null
   approveForm.city_name = location.city_candidate || location.location_name
-
-  // 获取所有省份
   const response = await getAllProvinces()
   if (response.code === 200) {
     allProvinces.value = response.data
   }
-
   auditDialogVisible.value = true
 }
 
@@ -1035,10 +939,8 @@ const handleConfirmApprove = async () => {
     ElMessage.warning('请选择省份并确认城市名称')
     return
   }
-
   try {
     const response = await approveLocation(currentLocation.value.id, approveForm)
-
     if (response.code === 200) {
       ElMessage.success('审核通过，城市已添加')
       auditDialogVisible.value = false
@@ -1059,7 +961,6 @@ const handleRejectLocation = async (location) => {
     await ElMessageBox.confirm(`确定要拒绝位置"${location.location_name}"吗？`, '警告', {
       type: 'warning'
     })
-
     const response = await rejectLocation(location.id)
     if (response.code === 200) {
       ElMessage.success('已拒绝')
@@ -1082,7 +983,6 @@ const handleBatchApprove = () => {
     ElMessage.warning('请先选择要审核的位置')
     return
   }
-
   batchAuditDialogVisible.value = true
 }
 
@@ -1092,14 +992,12 @@ const handleConfirmBatchApprove = async () => {
     ElMessage.warning('请选择省份')
     return
   }
-
   try {
     const locationIds = selectedLocations.value.map(loc => loc.id)
     const response = await batchApproveLocations({
       location_ids: locationIds,
       province_id: batchApproveForm.province_id
     })
-
     if (response.code === 200) {
       ElMessage.success(`成功添加 ${response.data.added_count} 个城市`)
       batchAuditDialogVisible.value = false
@@ -1130,47 +1028,38 @@ const handleUserSizeChange = (size) => {
   userPageSize.value = size
   fetchUsers()
 }
-
 const handleUserPageChange = (page) => {
   userCurrentPage.value = page
   fetchUsers()
 }
-
 const handleEarthquakeSizeChange = (size) => {
   earthquakePageSize.value = size
   fetchEarthquakes()
 }
-
 const handleEarthquakePageChange = (page) => {
   earthquakeCurrentPage.value = page
   fetchEarthquakes()
 }
-
 const handleChatSizeChange = (size) => {
   chatPageSize.value = size
   fetchChatRecords()
 }
-
 const handleChatPageChange = (page) => {
   chatCurrentPage.value = page
   fetchChatRecords()
 }
-
 const handleFeedbackSizeChange = (size) => {
   feedbackPageSize.value = size
   fetchFeedbacks()
 }
-
 const handleFeedbackPageChange = (page) => {
   feedbackCurrentPage.value = page
   fetchFeedbacks()
 }
-
 const handleAuditSizeChange = (size) => {
   auditPageSize.value = size
   fetchPendingLocations()
 }
-
 const handleAuditPageChange = (page) => {
   auditCurrentPage.value = page
   fetchPendingLocations()
@@ -1179,27 +1068,13 @@ const handleAuditPageChange = (page) => {
 // 菜单选择处理
 const handleMenuSelect = (index) => {
   activeMenu.value = index
-
-  // 根据菜单项加载对应数据
   switch (index) {
-    case 'user':
-      fetchUsers()
-      break
-    case 'province':
-      fetchProvinces()
-      break
-    case 'earthquake':
-      fetchEarthquakes()
-      break
-    case 'chat':
-      fetchChatRecords()
-      break
-    case 'feedback':
-      fetchFeedbacks()
-      break
-    case 'location-audit':
-      fetchPendingLocations()
-      break
+    case 'user': fetchUsers(); break
+    case 'province': fetchProvinces(); break
+    case 'earthquake': fetchEarthquakes(); break
+    case 'chat': fetchChatRecords(); break
+    case 'feedback': fetchFeedbacks(); break
+    case 'location-audit': fetchPendingLocations(); break
   }
 }
 
@@ -1217,30 +1092,16 @@ const formatDate = (dateString) => {
 // 导航到指定模块
 const navigateTo = (menu) => {
   activeMenu.value = menu
-
   switch (menu) {
-    case 'user':
-      fetchUsers()
-      break
-    case 'province':
-      fetchProvinces()
-      break
-    case 'earthquake':
-      fetchEarthquakes()
-      break
-    case 'chat':
-      fetchChatRecords()
-      break
-    case 'feedback':
-      fetchFeedbacks()
-      break
-    case 'location-audit':
-      fetchPendingLocations()
-      break
+    case 'user': fetchUsers(); break
+    case 'province': fetchProvinces(); break
+    case 'earthquake': fetchEarthquakes(); break
+    case 'chat': fetchChatRecords(); break
+    case 'feedback': fetchFeedbacks(); break
+    case 'location-audit': fetchPendingLocations(); break
   }
 }
 
-// 组件挂载时初始化
 onMounted(async () => {
   await fetchDashboardStats()
   await fetchAdminInfo()
