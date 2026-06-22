@@ -270,6 +270,12 @@ const deleteMessage = (msg) => {
   font-size: 14px;
   color: #606266;
   line-height: 1.6;
+  /* 允许在单行内换行 */
+  word-wrap: break-word;
+  /* 对于长字符串（如连续的1），强制在任何字符处换行 */
+  word-break: break-all;
+  /* 保留空白符序列，同时正常进行换行 */
+  white-space: pre-wrap;
 }
 
 /* 管理员操作按钮 */
