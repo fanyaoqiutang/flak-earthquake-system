@@ -26,10 +26,6 @@
           <el-icon><ChatLineRound /></el-icon>
           <span>聊天内容管理</span>
         </el-menu-item>
-        <el-menu-item index="feedback">
-          <el-icon><ChatDotRound /></el-icon>
-          <span>用户反馈处理</span>
-        </el-menu-item>
         <el-menu-item index="location-audit">
           <el-icon><DocumentChecked /></el-icon>
           <span>位置审核管理</span>
@@ -175,9 +171,27 @@
                 {{ formatDate(row.created_at) }}
               </template>
             </el-table-column>
+            <el-table-column label="状态" width="100">
+              <template #default="{ row }">
+                <el-tag :type="row.status === '正常' ? 'success' : row.status === '已禁用' ? 'danger' : 'info'">
+                  {{ row.status || '正常' }}
+                </el-tag>
+              </template>
+            </el-table-column>
             <el-table-column label="操作" width="200">
               <template #default="{ row }">
-                <el-button type="primary" size="small" @click="handleEditUser(row)">编辑</el-button>
+                <el-button
+                  v-if="row.status === '正常'"
+                  type="warning"
+                  size="small"
+                  @click="handleToggleUserStatus(row, '禁用')"
+                >禁用</el-button>
+                <el-button
+                  v-else
+                  type="success"
+                  size="small"
+                  @click="handleToggleUserStatus(row, '启用')"
+                >启用</el-button>
                 <el-button type="danger" size="small" @click="handleDeleteUser(row)">删除</el-button>
               </template>
             </el-table-column>
@@ -223,63 +237,6 @@
                 layout="total, sizes, prev, pager, next"
                 @size-change="handleChatSizeChange"
                 @current-change="handleChatPageChange"
-            />
-          </div>
-        </div>
-
-        <div v-if="activeMenu === 'feedback'">
-          <div class="section-header">
-            <h2>用户反馈处理</h2>
-          </div>
-          <el-table :data="feedbacks" v-loading="loading" style="width: 100%">
-            <el-table-column label="日期" width="150">
-              <template #default="{ row }">
-                {{ formatDate(row.created_at) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="user.username" label="用户名" width="120" />
-            <el-table-column prop="feedback_type" label="类型" width="100">
-              <template #default="{ row }">
-                <el-tag :type="row.feedback_type === 'bug' ? 'danger' : 'warning'">
-                  {{ row.feedback_type === 'bug' ? 'Bug' : '功能建议' }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="feedback_content" label="反馈内容" min-width="250" />
-            <el-table-column label="状态" width="100">
-              <template #default="{ row }">
-                <el-tag :type="row.status === 'pending' ? 'warning' : row.status === 'resolved' ? 'success' : 'info'">
-                  {{ row.status === 'pending' ? '待处理' : row.status === 'resolved' ? '已解决' : '已忽略' }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="200">
-              <template #default="{ row }">
-                <el-button
-                    v-if="row.status === 'pending'"
-                    type="success"
-                    size="small"
-                    @click="handleResolveFeedback(row)"
-                >标记已解决</el-button>
-                <el-button
-                    v-if="row.status === 'pending'"
-                    type="info"
-                    size="small"
-                    @click="handleIgnoreFeedback(row)"
-                >忽略</el-button>
-                <el-button type="danger" size="small" @click="handleDeleteFeedback(row)">删除</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-          <div class="pagination-container">
-            <el-pagination
-                v-model:current-page="feedbackCurrentPage"
-                v-model:page-size="feedbackPageSize"
-                :page-sizes="[10, 20, 50, 100]"
-                :total="feedbackTotal"
-                layout="total, sizes, prev, pager, next"
-                @size-change="handleFeedbackSizeChange"
-                @current-change="handleFeedbackPageChange"
             />
           </div>
         </div>
@@ -494,14 +451,13 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getDashboardStats, getAdminInfo, getAllUsers, deleteUser, updateUserInfo, getAllProvinces, deleteProvince, updateProvinceName, addProvince, getFeedbacks, updateFeedbackStatus, getPendingLocations, approveLocation, rejectLocation, batchApproveLocations } from '@/API/admin'
+import { getDashboardStats, getAdminInfo, getAllUsers, deleteUser, toggleUserStatus, updateUserInfo, getAllProvinces, deleteProvince, updateProvinceName, addProvince, getPendingLocations, approveLocation, rejectLocation, batchApproveLocations } from '@/API/admin'
 import {
   Monitor,
   Warning,
   Location,
   User,
   ChatLineRound,
-  ChatDotRound,
   View,
   Edit,
   Delete,
@@ -524,7 +480,6 @@ const dashboardData = reactive({
   totalUsers: 0,
   todayMessages: 0,
   totalEarthquakes: 0,
-  pendingFeedbacks: 0,
   pendingLocations: 0
 })
 
@@ -565,12 +520,6 @@ const chatRecords = ref([])
 const chatCurrentPage = ref(1)
 const chatPageSize = ref(10)
 const chatTotal = ref(0)
-
-// 反馈数据
-const feedbacks = ref([])
-const feedbackCurrentPage = ref(1)
-const feedbackPageSize = ref(10)
-const feedbackTotal = ref(0)
 
 // 位置审核数据
 const pendingLocations = ref([])
@@ -726,28 +675,6 @@ const fetchChatRecords = async () => {
   }
 }
 
-// 获取反馈列表
-const fetchFeedbacks = async () => {
-  loading.value = true
-  try {
-    const response = await getFeedbacks({
-      page: feedbackCurrentPage.value,
-      per_page: feedbackPageSize.value
-    })
-    if (response.code === 200) {
-      feedbacks.value = response.data.items
-      feedbackTotal.value = response.data.total
-    } else {
-      ElMessage.error(response.message || '获取反馈列表失败')
-    }
-  } catch (error) {
-    console.error('获取反馈列表失败:', error)
-    ElMessage.error('获取反馈列表失败')
-  } finally {
-    loading.value = false
-  }
-}
-
 // 获取待审核位置列表
 const fetchPendingLocations = async () => {
   loading.value = true
@@ -799,42 +726,31 @@ const handleDeleteUser = async (user) => {
   }
 }
 
-// 编辑用户
-const handleEditUser = async (user) => {
-  userDialogTitle.value = '编辑用户'
-  editUserForm.user_id = user.user_id
-  editUserForm.username = user.username
-  editUserForm.phone = user.phone
-  editUserForm.subscribed_provinces = user.subscribed_provinces.map(p => p.province_id)
-
-  // 获取所有省份
-  const response = await getAllProvinces()
-  if (response.code === 200) {
-    allProvinces.value = response.data
-  }
-
-  userDialogVisible.value = true
-}
-
-// 保存用户
-const handleSaveUser = async () => {
+// 切换用户状态（启用/禁用）
+const handleToggleUserStatus = async (user, action) => {
   try {
-    const response = await updateUserInfo(editUserForm.user_id, {
-      username: editUserForm.username,
-      phone: editUserForm.phone,
-      subscribed_provinces: editUserForm.subscribed_provinces
+    const confirmMsg = action === '禁用'
+      ? `确定要禁用用户 ${user.username} 吗？禁用后该用户将无法登录。`
+      : `确定要启用用户 ${user.username} 吗？`
+
+    await ElMessageBox.confirm(confirmMsg, '确认操作', {
+      type: 'warning'
     })
 
+    // 调用后端API切换状态
+    const response = await toggleUserStatus(user.user_id)
     if (response.code === 200) {
-      ElMessage.success('保存成功')
-      userDialogVisible.value = false
+      ElMessage.success(`${action}成功`)
       fetchUsers()
+      fetchDashboardStats()
     } else {
-      ElMessage.error(response.message || '保存失败')
+      ElMessage.error(response.msg || `${action}失败`)
     }
   } catch (error) {
-    console.error('保存用户失败:', error)
-    ElMessage.error('保存用户失败')
+    if (error !== 'cancel') {
+      console.error(`切换用户状态失败:`, error)
+      ElMessage.error('操作失败')
+    }
   }
 }
 
@@ -949,67 +865,6 @@ const handleDeleteChat = async (record) => {
     if (error !== 'cancel') {
       console.error('删除聊天记录失败:', error)
       ElMessage.error('删除聊天记录失败')
-    }
-  }
-}
-
-// 标记反馈已解决
-const handleResolveFeedback = async (feedback) => {
-  try {
-    const response = await updateFeedbackStatus(feedback.id, 'resolved')
-    if (response.code === 200) {
-      ElMessage.success('已标记为已解决')
-      fetchFeedbacks()
-      fetchDashboardStats()
-    } else {
-      ElMessage.error(response.message || '操作失败')
-    }
-  } catch (error) {
-    console.error('更新反馈状态失败:', error)
-    ElMessage.error('操作失败')
-  }
-}
-
-// 忽略反馈
-const handleIgnoreFeedback = async (feedback) => {
-  try {
-    const response = await updateFeedbackStatus(feedback.id, 'ignored')
-    if (response.code === 200) {
-      ElMessage.success('已忽略')
-      fetchFeedbacks()
-      fetchDashboardStats()
-    } else {
-      ElMessage.error(response.message || '操作失败')
-    }
-  } catch (error) {
-    console.error('更新反馈状态失败:', error)
-    ElMessage.error('操作失败')
-  }
-}
-
-// 删除反馈
-const handleDeleteFeedback = async (feedback) => {
-  try {
-    await ElMessageBox.confirm('确定要删除该反馈吗？', '警告', {
-      type: 'warning'
-    })
-
-    const response = await fetch(`/api/admin/feedbacks/${feedback.id}`, {
-      method: 'DELETE'
-    })
-    const data = await response.json()
-
-    if (data.code === 200) {
-      ElMessage.success('删除成功')
-      fetchFeedbacks()
-      fetchDashboardStats()
-    } else {
-      ElMessage.error(data.message || '删除失败')
-    }
-  } catch (error) {
-    if (error !== 'cancel') {
-      console.error('删除反馈失败:', error)
-      ElMessage.error('删除反馈失败')
     }
   }
 }
@@ -1156,16 +1011,6 @@ const handleChatPageChange = (page) => {
   fetchChatRecords()
 }
 
-const handleFeedbackSizeChange = (size) => {
-  feedbackPageSize.value = size
-  fetchFeedbacks()
-}
-
-const handleFeedbackPageChange = (page) => {
-  feedbackCurrentPage.value = page
-  fetchFeedbacks()
-}
-
 const handleAuditSizeChange = (size) => {
   auditPageSize.value = size
   fetchPendingLocations()
@@ -1193,9 +1038,6 @@ const handleMenuSelect = (index) => {
       break
     case 'chat':
       fetchChatRecords()
-      break
-    case 'feedback':
-      fetchFeedbacks()
       break
     case 'location-audit':
       fetchPendingLocations()
@@ -1230,9 +1072,6 @@ const navigateTo = (menu) => {
       break
     case 'chat':
       fetchChatRecords()
-      break
-    case 'feedback':
-      fetchFeedbacks()
       break
     case 'location-audit':
       fetchPendingLocations()

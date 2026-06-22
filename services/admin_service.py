@@ -422,55 +422,82 @@ def svc_admin_get_all_users():
     if not verify_admin():
         return jsonify({"code": 403, "msg": "无管理员权限"}), 403
 
-    keyword = request.args.get("keyword")
-    status = request.args.get("status")
+    try:
+        # 获取分页参数
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 10))
+        
+        keyword = request.args.get("keyword")
+        status = request.args.get("status")
 
-    query = User.query
+        query = User.query
 
-    if status:
-        query = query.filter_by(status=status)
-    if keyword:
-        query = query.filter(
-            (User.user_account.like(f"%{keyword}%")) |
-            (User.phone.like(f"%{keyword}%"))
-        )
+        if status:
+            query = query.filter_by(status=status)
+        if keyword:
+            query = query.filter(
+                (User.user_account.like(f"%{keyword}%")) |
+                (User.phone.like(f"%{keyword}%"))
+            )
 
-    users = query.all()
-    data = []
-    now = dt.datetime.now()
+        # 按创建时间倒序排列
+        query = query.order_by(desc(User.create_time))
+        
+        # 分页
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
 
-    for u in users:
-        subs = UserSubscribeProvince.query.filter_by(user_id=u.user_id).all()
-        provinces = []
-        for s in subs:
-            p = Province.query.get(s.province_id)
-            if p:
-                provinces.append(p.province_name)
+        data = []
+        now = dt.datetime.now()
 
-        # 最后活跃时间格式化
-        if u.last_active_time:
-            delta = now - u.last_active_time
-            if delta.days >= 1:
-                last = f"{delta.days}天前"
-            elif delta.seconds >= 3600:
-                last = f"{delta.seconds//3600}小时前"
-            elif delta.seconds >= 60:
-                last = f"{delta.seconds//60}分钟前"
+        for u in pagination.items:
+            subs = UserSubscribeProvince.query.filter_by(user_id=u.user_id).all()
+            provinces = []
+            for s in subs:
+                p = Province.query.get(s.province_id)
+                if p:
+                    provinces.append({
+                        "province_id": p.province_id,
+                        "province_name": p.province_name
+                    })
+
+            # 最后活跃时间格式化
+            if u.last_active_time:
+                delta = now - u.last_active_time
+                if delta.days >= 1:
+                    last = f"{delta.days}天前"
+                elif delta.seconds >= 3600:
+                    last = f"{delta.seconds//3600}小时前"
+                elif delta.seconds >= 60:
+                    last = f"{delta.seconds//60}分钟前"
+                else:
+                    last = "刚刚"
             else:
-                last = "刚刚"
-        else:
-            last = "未知"
+                last = "未知"
 
-        data.append({
-            "user_id": u.user_id,
-            "user_account": u.user_account,
-            "phone": u.phone or "未绑定",
-            "status": u.status,
-            "create_time": u.create_time.strftime("%Y-%m-%d %H:%M:%S"),
-            "last_active": last,
-            "subscribed_provinces": provinces
+            data.append({
+                "user_id": u.user_id,
+                "username": u.user_account,
+                "phone": u.phone or "",
+                "status": u.status,
+                "created_at": u.create_time.strftime("%Y-%m-%d %H:%M:%S"),
+                "last_active": last,
+                "subscribed_provinces": provinces
+            })
+        
+        return jsonify({
+            "code": 200,
+            "data": {
+                "items": data,
+                "total": pagination.total,
+                "page": page,
+                "per_page": per_page
+            }
         })
-    return jsonify({"code": 200, "data": data})
+    except Exception as e:
+        print(f"[ERROR] 获取用户列表失败: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"code": 500, "msg": f"获取用户列表失败: {str(e)}"}), 500
 
 # 用户统计（总用户/活跃/禁用）
 def svc_admin_get_user_stats():
