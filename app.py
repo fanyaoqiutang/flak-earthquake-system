@@ -13,10 +13,14 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app, supports_credentials=True, origins=['http://localhost:5173', 'http://127.0.0.1:5173'])
 app.secret_key = "earthquake_2025_secure_key_change_in_production"
+
+# 简化的 Session 配置
+app.config['SESSION_COOKIE_NAME'] = 'session'
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = False
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['PERMANENT_SESSION_LIFETIME'] = 86400 * 7
+app.config['SESSION_COOKIE_PATH'] = '/'
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///test.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -31,7 +35,7 @@ db.init_app(app)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
-login_manager.session_protection = "strong"
+login_manager.session_protection = None  # 关闭 session 保护，避免频繁失效
 login_manager.login_message = "请先登录"
 
 @login_manager.user_loader

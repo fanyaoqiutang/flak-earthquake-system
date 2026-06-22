@@ -1242,9 +1242,34 @@ const navigateTo = (menu) => {
 
 // 组件挂载时初始化
 onMounted(async () => {
-  await fetchDashboardStats()
-  await fetchAdminInfo()
+  // 检查是否有管理员 token
+  const adminToken = localStorage.getItem('admin_token')
+  if (!adminToken) {
+    console.warn('⚠️ 未找到 admin_token，跳转到登录页')
+    ElMessage.warning('请先登录')
+    router.push('/login')
+    return
+  }
+
+  console.log('✅ 开始加载管理员页面数据')
+
+  try {
+    // 并行加载数据，提高性能
+    await Promise.all([
+      fetchDashboardStats(),
+      fetchAdminInfo()
+    ])
+    console.log('✅ 管理员页面数据加载完成')
+  } catch (error) {
+    console.error('❌ 加载管理员数据失败:', error)
+    // 如果加载失败，可能是 token 无效，跳转到登录页
+    if (error.response?.status === 401 || error.message?.includes('401')) {
+      ElMessage.warning('登录已过期，请重新登录')
+      router.push('/login')
+    }
+  }
 })
+
 </script>
 
 <style scoped>

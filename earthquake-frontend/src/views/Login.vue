@@ -161,6 +161,7 @@ const handleLogin = async () => {
       const accountKey = loginType.value === 'user' ? 'user_account' : 'admin_account'
       const idKey = loginType.value === 'user' ? 'user_id' : 'admin_id'
 
+      // 保存登录信息
       localStorage.setItem(tokenKey, response.data[tokenKey])
       localStorage.setItem(accountKey, response.data[accountKey])
       if (response.data[idKey]) {
@@ -168,14 +169,23 @@ const handleLogin = async () => {
       }
       localStorage.setItem('user_role', loginType.value)
 
+      console.log(`✅ 登录成功 - 角色: ${loginType.value}, Token: ${response.data[tokenKey].substring(0, 8)}...`)
+
       ElMessage.success('登录成功')
 
-      const redirectPath = localStorage.getItem('redirect_path') || '/'
+      // 根据角色跳转到不同页面
+      const redirectPath = localStorage.getItem('redirect_path') ||
+                          (loginType.value === 'admin' ? '/admin/profile' : '/')
       localStorage.removeItem('redirect_path')
-      router.push(redirectPath)
+
+      // 延迟跳转，确保 token 已保存
+      setTimeout(() => {
+        router.push(redirectPath)
+      }, 300)
     }
   } catch (error) {
     console.error('登录错误:', error)
+    // 错误信息已在 request.js 中显示
   } finally {
     loading.value = false
   }

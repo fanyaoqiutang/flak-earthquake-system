@@ -177,6 +177,46 @@ def svc_delete_account(user_id):
 
     return jsonify({"code": 200, "msg": "账号已注销"})
 
+
+def svc_change_password(user_id, data):
+    """修改用户密码"""
+    old_password = data.get("old_password", "")
+    new_password = data.get("new_password", "")
+    confirm_password = data.get("confirm_password", "")
+    
+    # 参数验证
+    if not old_password or not new_password or not confirm_password:
+        return jsonify({"code": 400, "msg": "请填写所有密码字段"}), 400
+    
+    if len(new_password) < 6:
+        return jsonify({"code": 400, "msg": "新密码长度至少6位"}), 400
+    
+    if new_password != confirm_password:
+        return jsonify({"code": 400, "msg": "两次输入的新密码不一致"}), 400
+    
+    # 获取用户
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"code": 404, "msg": "用户不存在"}), 404
+    
+    if user.status == "已注销":
+        return jsonify({"code": 400, "msg": "账号已注销"}), 400
+    
+    # 验证旧密码
+    if not check_password_hash(user.password, old_password):
+        return jsonify({"code": 401, "msg": "原密码错误"}), 401
+    
+    # 检查新密码是否与旧密码相同
+    if check_password_hash(user.password, new_password):
+        return jsonify({"code": 400, "msg": "新密码不能与原密码相同"}), 400
+    
+    # 更新密码
+    user.password = generate_password_hash(new_password)
+    db.session.commit()
+    
+    return jsonify({"code": 200, "msg": "密码修改成功"})
+
+
 # ====================== 订阅 ======================
 def svc_subscribe_province():
     data = request.get_json(force=True)
@@ -308,9 +348,15 @@ def svc_get_user_alerts():
 
 
 def svc_get_unread_alerts_count():
-    cnt = UserEarthquakeAlert.query.filter_by(user_id=current_user.user_id, is_read=False).count()
-    return jsonify({"code": 200, "data": {"unread_count": cnt}})
-
+    # 先判断是否登录
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"code": 401, "msg": "请先登录"}), 401
+    cnt = UserEarthquakeAlert.query.filter_by(user_id=user_id, is_read=False).count()
+    return jsonify({
+        "code": 200,
+        "data": {"unread_count": cnt}
+    })
 
 def svc_mark_alert_read(alert_id):
     a = UserEarthquakeAlert.query.get(alert_id)

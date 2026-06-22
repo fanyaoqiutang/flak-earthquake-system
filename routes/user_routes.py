@@ -44,7 +44,7 @@ def alerts():
     return svc_get_user_alerts()
 
 @user_bp.route("/alerts/unread", methods=["GET"])
-# @login_required  # 临时注释，service层已有兜底逻辑
+@login_required  # 新增登录校验，未登录直接返回401，不会进入业务代码
 def unread():
     return svc_get_unread_alerts_count()
 
