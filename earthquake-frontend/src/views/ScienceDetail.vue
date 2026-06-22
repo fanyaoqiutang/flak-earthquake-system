@@ -69,10 +69,11 @@ const goBack = () => {
   router.back()
 }
 
-// 格式化内容（将换行符转换为HTML）
+// 格式化内容（直接返回HTML内容）
 const formatContent = (content) => {
   if (!content) return ''
-  return content.replace(/\n/g, '<br>')
+  // 不再转换换行符，直接返回HTML内容
+  return content
 }
 
 onMounted(() => {
@@ -187,6 +188,116 @@ onMounted(() => {
   color: #303133;
   line-height: 2;
   font-size: 15px;
-  white-space: pre-wrap;
+  /* 删除 white-space: pre-wrap，让HTML正常渲染 */
+}
+
+/* 添加HTML内容的样式支持 */
+.content :deep(p) {
+  margin-bottom: 1em;
+}
+
+.content :deep(h1),
+.content :deep(h2),
+.content :deep(h3),
+.content :deep(h4),
+.content :deep(h5),
+.content :deep(h6) {
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  font-weight: bold;
+  color: #1E293B;
+}
+
+.content :deep(img) {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 1em auto;
+}
+
+.content :deep(ul),
+.content :deep(ol) {
+  padding-left: 2em;
+  margin-bottom: 1em;
+}
+
+.content :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1em;
+}
+
+.content :deep(table th),
+.content :deep(table td) {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: left;
+}
+
+.content :deep(a) {
+  color: #409eff;
+  text-decoration: none;
+}
+
+.content :deep(a:hover) {
+  text-decoration: underline;
+}
+
+/* 引用块样式 */
+.content :deep(blockquote) {
+  margin: 1.5em 0;
+  padding: 16px 20px;
+  background: #f5f7fa;
+  border-left: 4px solid #409eff;
+  border-radius: 0 8px 8px 0;
+  color: #606266;
+  font-style: italic;
+}
+
+/* 强调文本 */
+.content :deep(strong),
+.content :deep(b) {
+  color: #1E293B;
+  font-weight: 600;
+}
+
+.content :deep(em),
+.content :deep(i) {
+  color: #409eff;
+  font-style: normal;
+}
+
+/* 代码块 */
+.content :deep(code) {
+  background: #f5f7fa;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9em;
+  color: #e96900;
+}
+
+.content :deep(pre) {
+  background: #282c34;
+  color: #abb2bf;
+  padding: 16px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 1.5em 0;
+}
+
+.content :deep(pre code) {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+/* 分隔线 */
+.content :deep(hr) {
+  border: none;
+  height: 2px;
+  background: linear-gradient(to right, #409eff, #66b1ff);
+  margin: 2em 0;
+  border-radius: 1px;
 }
 </style>

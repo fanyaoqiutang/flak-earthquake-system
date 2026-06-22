@@ -7,7 +7,7 @@ import os
 
 
 # ============ AI智能问答配置 ============
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
+DEEPSEEK_API_KEY = "sk-a30b3e2503c14fda9fd0a915d3de05f6"
 DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
 
 # 地震列表信息按条件筛查
