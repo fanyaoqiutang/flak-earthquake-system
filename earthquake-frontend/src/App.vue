@@ -213,9 +213,10 @@ defineExpose({
 
 <style scoped>
 .app-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #409eff;
   color: white;
   padding: 0;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.3);
 }
 
 .header-content {
@@ -227,9 +228,10 @@ defineExpose({
 }
 
 .logo {
-  font-size: 24px;
+  font-size: 22px;
   font-weight: bold;
   margin-right: 40px;
+  letter-spacing: 2px;
 }
 
 .main-menu {
@@ -240,16 +242,21 @@ defineExpose({
 
 .main-menu :deep(.el-menu-item) {
   color: rgba(255, 255, 255, 0.9);
+  font-weight: 500;
+  transition: all 0.3s ease;
+  border-bottom: 3px solid transparent;
 }
 
 .main-menu :deep(.el-menu-item:hover) {
   background: rgba(255, 255, 255, 0.1);
   color: white;
+  border-bottom-color: rgba(255, 255, 255, 0.5);
 }
 
 .main-menu :deep(.el-menu-item.is-active) {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.15);
   color: white;
+  border-bottom-color: white;
 }
 
 .user-info {
@@ -267,6 +274,6 @@ defineExpose({
 }
 
 .user-name:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.15);
 }
 </style>
