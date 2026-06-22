@@ -85,6 +85,9 @@
 
       <!-- 全局预警弹窗 -->
       <EarthquakeAlert v-if="alertComponentReady" ref="alertRef" />
+
+      <!-- AI智能助手悬浮球 -->
+      <AiFloatBall />
     </el-config-provider>
   </div>
 </template>
@@ -99,6 +102,7 @@ import {
   ArrowDown, SwitchButton
 } from '@element-plus/icons-vue'
 import EarthquakeAlert from './components/EarthquakeAlert.vue'
+import AiFloatBall from './components/AiFloatBall.vue'
 import { userLogout, getUnreadAlertsCount } from './API/user'
 
 const router = useRouter()
