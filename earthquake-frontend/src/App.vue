@@ -213,67 +213,97 @@ defineExpose({
 
 <style scoped>
 .app-header {
-  background: #409eff;
-  color: white;
+  background: linear-gradient(to right, #4096ff 0%, #2b7de9 100%);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
   padding: 0;
-  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.3);
+  height: 64px;
 }
 
 .header-content {
+  max-width: 1400px;
+  margin: 0 auto;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   height: 100%;
-  padding: 0 20px;
+  padding: 0 24px;
+  gap: 48px;
 }
 
 .logo {
-  font-size: 22px;
-  font-weight: bold;
-  margin-right: 40px;
-  letter-spacing: 2px;
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: 1px;
+  flex-shrink: 0;
 }
 
 .main-menu {
   flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
   background: transparent;
   border-bottom: none;
 }
 
 .main-menu :deep(.el-menu-item) {
-  color: rgba(255, 255, 255, 0.9);
-  font-weight: 500;
-  transition: all 0.3s ease;
-  border-bottom: 3px solid transparent;
+  color: rgba(255, 255, 255, 0.92);
+  border-bottom: none !important;
+  transition: all 0.24s ease;
+  font-size: 16px;
+  height: 64px;
+  line-height: 64px;
+  padding: 0 22px;
+  background: transparent !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .main-menu :deep(.el-menu-item:hover) {
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
-  border-bottom-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.22) !important;
+  color: #ffffff !important;
 }
 
 .main-menu :deep(.el-menu-item.is-active) {
-  background: rgba(255, 255, 255, 0.15);
-  color: white;
-  border-bottom-color: white;
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.26) !important;
+  border-bottom: 3px solid #fff !important;
+  font-weight: 600;
+}
+
+.main-menu :deep(.el-menu-item .el-icon) {
+  margin-right: 6px;
+  font-size: 18px;
 }
 
 .user-info {
   margin-left: 20px;
+  flex-shrink: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
 }
 
 .user-name {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   cursor: pointer;
-  padding: 8px 16px;
-  border-radius: 20px;
-  transition: background 0.3s;
+  padding: 8px 14px;
+  border-radius: 6px;
+  transition: all 0.24s ease;
+  color: white;
 }
 
 .user-name:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.user-name :deep(.el-avatar) {
+  background: rgba(255, 255, 255, 0.25);
+  border: 2px solid rgba(255, 255, 255, 0.55);
 }
 </style>

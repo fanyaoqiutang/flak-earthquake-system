@@ -27,7 +27,7 @@
         <el-form-item>
           <el-input
             v-model="form.account"
-            placeholder="请输入账号(3-20位)"
+            placeholder="请输入用户名(3-20位)"
             prefix-icon="User"
             size="large"
             clearable
