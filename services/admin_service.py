@@ -2,64 +2,194 @@ from flask import request, jsonify, session
 from werkzeug.security import generate_password_hash, check_password_hash
 import secrets
 import datetime as dt
-# from datetime import  datetime
 from models import db, Admin, EarthquakeInfo, Province, City, ChatMessage, UserFeedback, User, AdminOperationLog, UserSubscribeProvince, UserEarthquakeAlert
 from sqlalchemy import func, desc
 
 ADMIN_SECRET_KEY = "ADMIN_2025_EARTHQUAKE"
 
-# 管理员身份验证（增强版）
 def verify_admin():
     """
-    验证管理员身份
-    支持两种验证方式：
-    1. Session 验证（优先）
-    2. Token 验证（降级方案）
+    管理员身份验证 - 简化版
+    只检查 session，不依赖 token
     """
-    # 方式1：检查 session 中的 is_admin 标志
-    if session.get('is_admin'):
-        print(f"[DEBUG] Session 验证通过 - admin_id: {session.get('admin_id')}")
+    is_admin = session.get('is_admin', False)
+    admin_id = session.get('admin_id')
+    
+    if is_admin and admin_id:
         return True
     
-    # 方式2：尝试从请求头获取 token
-    token = request.headers.get('X-Admin-Token')
-    if not token:
-        # 兼容旧方式：从请求体获取
-        data = request.get_json(silent=True) or {}
-        token = data.get('admin_token')
-    
-    if token:
-        # 检查 token 是否与 session 中存储的一致
-        session_token = session.get('admin_token')
-        if session_token and token == session_token:
-            print(f"[DEBUG] Token 匹配验证通过")
-            return True
-        
-        # 如果 session 中没有 token，但 token 格式正确，认为有效
-        # 这种情况可能是因为 session 丢失或分布式部署
-        if len(token) == 64:  # secrets.token_hex(32) 生成64位十六进制
-            print(f"[DEBUG] Token 格式验证通过，恢复 session")
-            # 恢复 session 状态
-            session.permanent = True
-            session['is_admin'] = True
-            session['admin_token'] = token
-            
-            # 尝试从数据库查询管理员信息（如果有 admin_id 的话）
-            # 这里简化处理，实际应该将 token 与管理员关联存储到数据库
-            return True
-    
-    print(f"[DEBUG] 验证失败 - session.is_admin: {session.get('is_admin')}, has_token: {bool(token)}")
     return False
 
-# 管理员操作日志（记录增删改操作）
-def add_admin_log(admin_id, operation, target_earthquake_id=None, remark=""):
-    log = AdminOperationLog(
-        admin_id=admin_id,
-        operation=operation,
-        target_earthquake_id=target_earthquake_id,
-    )
-    db.session.add(log)
-    db.session.commit()
+
+def svc_admin_login():
+    """管理员登录 - 简化版"""
+    try:
+        data = request.get_json(force=True)
+        account = data.get('admin_account')
+        pwd = data.get('password')
+        admin_key = data.get('admin_key')
+
+        if not account or not pwd:
+            return jsonify({"code": 400, "msg": "账号和密码不能为空"}), 400
+        
+        if not admin_key:
+            return jsonify({"code": 400, "msg": "请输入管理员密钥"}), 400
+
+        if admin_key != ADMIN_SECRET_KEY:
+            return jsonify({"code": 403, "msg": "管理员密钥错误"}), 403
+
+        admin = Admin.query.filter_by(admin_account=account).first()
+        if not admin:
+            return jsonify({"code": 401, "msg": "管理员账号不存在"}), 401
+        
+        if not check_password_hash(admin.password, pwd):
+            return jsonify({"code": 401, "msg": "密码错误"}), 401
+
+        # 设置 session
+        session.permanent = True
+        session['is_admin'] = True
+        session['admin_id'] = admin.admin_id
+        session['admin_account'] = admin.admin_account
+        
+        # 生成 token（用于前端存储和后续请求）
+        token = secrets.token_hex(32)
+        session['admin_token'] = token
+
+        return jsonify({
+            "code": 200, 
+            "msg": "登录成功", 
+            "data": {
+                "admin_token": token, 
+                "admin_account": admin.admin_account,
+                "admin_id": admin.admin_id
+            }
+        })
+    except Exception as e:
+        print(f"[ERROR] 管理员登录失败: {e}")
+        return jsonify({"code": 500, "msg": f"服务器错误: {str(e)}"}), 500
+
+
+def svc_admin_logout():
+    """管理员登出"""
+    session.clear()
+    return jsonify({"code": 200, "msg": "退出成功"})
+
+
+def svc_admin_info():
+    """获取当前登录的管理员信息"""
+    if not verify_admin():
+        return jsonify({"code": 401, "msg": "未登录或登录已过期"}), 401
+    
+    return jsonify({
+        "code": 200, 
+        "data": {
+            "admin_id": session.get("admin_id"), 
+            "admin_account": session.get("admin_account")
+        }
+    })
+
+
+def svc_get_dashboard_stats():
+    """获取仪表盘统计数据"""
+    if not verify_admin():
+        return jsonify({"code": 403, "msg": "无权限，请先登录"}), 403
+
+    try:
+        total_users = User.query.count()
+        today = dt.datetime.now().date()
+        today_messages = ChatMessage.query.filter(
+            func.date(ChatMessage.create_time) == today
+        ).count()
+        total_earthquakes = EarthquakeInfo.query.count()
+        pending_feedbacks = UserFeedback.query.filter_by(status='未处理').count()
+
+        return jsonify({
+            'code': 200,
+            'data': {
+                'totalUsers': total_users,
+                'todayMessages': today_messages,
+                'totalEarthquakes': total_earthquakes,
+                'pendingFeedbacks': pending_feedbacks
+            }
+        })
+    except Exception as e:
+        return jsonify({'code': 500, 'msg': f'获取统计数据失败: {str(e)}'}), 500
+
+
+def svc_admin_get_all_users():
+    """获取所有用户列表（支持分页）"""
+    if not verify_admin():
+        return jsonify({"code": 403, "msg": "无权限"}), 403
+
+    try:
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 10))
+        
+        keyword = request.args.get("keyword")
+        status = request.args.get("status")
+
+        query = User.query
+
+        if status:
+            query = query.filter_by(status=status)
+        if keyword:
+            query = query.filter(
+                (User.user_account.like(f"%{keyword}%")) |
+                (User.phone.like(f"%{keyword}%"))
+            )
+
+        query = query.order_by(desc(User.create_time))
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+
+        data = []
+        now = dt.datetime.now()
+
+        for u in pagination.items:
+            subs = UserSubscribeProvince.query.filter_by(user_id=u.user_id).all()
+            provinces = []
+            for s in subs:
+                p = Province.query.get(s.province_id)
+                if p:
+                    provinces.append({
+                        "province_id": p.province_id,
+                        "province_name": p.province_name
+                    })
+
+            if u.last_active_time:
+                delta = now - u.last_active_time
+                if delta.days >= 1:
+                    last = f"{delta.days}天前"
+                elif delta.seconds >= 3600:
+                    last = f"{delta.seconds//3600}小时前"
+                elif delta.seconds >= 60:
+                    last = f"{delta.seconds//60}分钟前"
+                else:
+                    last = "刚刚"
+            else:
+                last = "未知"
+
+            data.append({
+                "user_id": u.user_id,
+                "username": u.user_account,
+                "phone": u.phone or "",
+                "status": u.status,
+                "created_at": u.create_time.strftime("%Y-%m-%d %H:%M:%S"),
+                "last_active": last,
+                "subscribed_provinces": provinces
+            })
+        
+        return jsonify({
+            "code": 200,
+            "data": {
+                "items": data,
+                "total": pagination.total,
+                "page": page,
+                "per_page": per_page
+            }
+        })
+    except Exception as e:
+        print(f"[ERROR] 获取用户列表失败: {e}")
+        return jsonify({"code": 500, "msg": f"获取用户列表失败: {str(e)}"}), 500
 
 
 # 自动生成预警
@@ -107,89 +237,15 @@ def svc_admin_register():
     db.session.commit()
     return jsonify({"code": 200, "msg": "注册成功"})
 
-# 管理员登录（重写版）
-def svc_admin_login():
-    """管理员登录"""
-    try:
-        data = request.get_json(force=True)
-        account = data.get('admin_account')
-        pwd = data.get('password')
-        admin_key = data.get('admin_key')
-
-        # 参数验证
-        if not account or not pwd:
-            return jsonify({"code": 400, "msg": "账号和密码不能为空"}), 400
-        
-        if not admin_key:
-            return jsonify({"code": 400, "msg": "请输入管理员密钥"}), 400
-
-        # 验证管理员密钥
-        if admin_key != ADMIN_SECRET_KEY:
-            return jsonify({"code": 403, "msg": "管理员密钥错误"}), 403
-
-        # 查询管理员
-        admin = Admin.query.filter_by(admin_account=account).first()
-        if not admin:
-            return jsonify({"code": 401, "msg": "管理员账号不存在"}), 401
-        
-        # 验证密码
-        if not check_password_hash(admin.password, pwd):
-            return jsonify({"code": 401, "msg": "密码错误"}), 401
-
-        # 设置 session
-        session.permanent = True  # 启用永久 session
-        session['is_admin'] = True
-        session['admin_id'] = admin.admin_id
-        session['admin_account'] = admin.admin_account
-        
-        # 生成 token
-        token = secrets.token_hex(32)
-        session['admin_token'] = token
-
-        print(f"[INFO] ✅ 管理员 {account} (ID:{admin.admin_id}) 登录成功")
-        print(f"[INFO] Session ID: {session.sid if hasattr(session, 'sid') else 'N/A'}")
-        print(f"[INFO] Token: {token[:8]}...")
-
-        return jsonify({
-            "code": 200, 
-            "msg": "登录成功", 
-            "data": {
-                "admin_token": token, 
-                "admin_account": admin.admin_account,
-                "admin_id": admin.admin_id
-            }
-        })
-    except Exception as e:
-        print(f"[ERROR] ❌ 管理员登录失败: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({"code": 500, "msg": f"服务器错误: {str(e)}"}), 500
-
-# 管理员登出（重写版）
-def svc_admin_logout():
-    """管理员登出"""
-    session.clear()
-    return jsonify({"code": 200, "msg": "退出成功"})
-
-# 获取当前管理员信息（重写版）
-def svc_admin_info():
-    """获取当前登录的管理员信息"""
-    if not verify_admin():
-        print(f"[WARN] ️ 获取管理员信息失败 - 未通过验证")
-        return jsonify({"code": 401, "msg": "未登录或登录已过期，请重新登录"}), 401
-    
-    admin_id = session.get("admin_id")
-    admin_account = session.get("admin_account")
-    
-    print(f"[INFO] ✅ 获取管理员信息成功 - ID:{admin_id}, Account:{admin_account}")
-    
-    return jsonify({
-        "code": 200, 
-        "data": {
-            "admin_id": admin_id, 
-            "admin_account": admin_account
-        }
-    })
+# 管理员操作日志（记录增删改操作）
+def add_admin_log(admin_id, operation, target_earthquake_id=None, remark=""):
+    log = AdminOperationLog(
+        admin_id=admin_id,
+        operation=operation,
+        target_earthquake_id=target_earthquake_id,
+    )
+    db.session.add(log)
+    db.session.commit()
 
 
 # 新增地震信息
@@ -538,48 +594,6 @@ def svc_admin_delete_chat_msg(msg_id):
     db.session.commit()
     return jsonify({"code": 200, "msg": "删除成功"})
 
-
-
-# 获取仪表盘统计数据（增强错误处理）
-def svc_get_dashboard_stats():
-    """获取仪表盘统计数据"""
-    if not verify_admin():
-        print(f"[WARN] ⚠️ 获取仪表盘数据失败 - 未通过验证")
-        return jsonify({"code": 403, "msg": "无权限，请先登录"}), 403
-
-    try:
-        # 总用户数
-        total_users = User.query.count()
-
-        # 今日新增消息
-        today = dt.datetime.now().date()
-        today_messages = ChatMessage.query.filter(
-            func.date(ChatMessage.create_time) == today
-        ).count()
-
-        # 地震数据总数
-        total_earthquakes = EarthquakeInfo.query.count()
-
-        # 待处理反馈
-        pending_feedbacks = UserFeedback.query.filter_by(status='未处理').count()
-
-        print(f"[INFO] ✅ 获取仪表盘数据成功")
-
-        return jsonify({
-            'code': 200,
-            'data': {
-                'totalUsers': total_users,
-                'todayMessages': today_messages,
-                'totalEarthquakes': total_earthquakes,
-                'pendingFeedbacks': pending_feedbacks
-            }
-        })
-
-    except Exception as e:
-        print(f"[ERROR] ❌ 获取仪表盘数据失败: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'code': 500, 'msg': f'获取统计数据失败: {str(e)}'}), 500
 
 
 # 获取地震列表（分页）

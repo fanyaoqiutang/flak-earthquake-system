@@ -1,4 +1,4 @@
-from flask import Flask,render_template
+from flask import Flask, render_template
 from flask_login import LoginManager
 from flask_cors import CORS
 from models import db, User, Admin
