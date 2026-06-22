@@ -280,11 +280,11 @@ const loadEarthquakeData = async () => {
     }
 
     if (selectedProvinceId.value) {
-      params.province_id = selectedProvinceId.value
+      params.province_id = selectedProvinceId
     }
 
     if (selectedCityId.value) {
-      params.city_id = selectedCityId.value
+      params.city_id = selectedCityId
     }
 
     const response = await getEarthquakeList(params)
@@ -372,6 +372,12 @@ const addMarkers = () => {
       ">${item.magnitude.toFixed(1)}</div>`,
       offset: new AMap.Pixel(-size/2, -size/2)
     })
+
+    // 添加点击事件，显示详情弹窗
+    marker.on('click', () => {
+      showDetail(item)
+    })
+
     markers.push(marker)
     map.add(marker)
   })
