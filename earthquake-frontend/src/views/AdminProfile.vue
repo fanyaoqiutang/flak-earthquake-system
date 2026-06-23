@@ -822,8 +822,16 @@ const handleDeleteEarthquake = async (earthquake) => {
       type: 'warning'
     })
 
-    const response = await fetch(`/api/admin/earthquakes/${earthquake.id}`, {
-      method: 'DELETE'
+    console.log('删除地震数据:', earthquake) // 调试日志
+
+    const response = await fetch('/api/admin/earthquake/delete', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        earthquake_id: earthquake.earthquake_id
+      })
     })
     const data = await response.json()
 
@@ -832,7 +840,7 @@ const handleDeleteEarthquake = async (earthquake) => {
       fetchEarthquakes()
       fetchDashboardStats()
     } else {
-      ElMessage.error(data.message || '删除失败')
+      ElMessage.error(data.msg || '删除失败')
     }
   } catch (error) {
     if (error !== 'cancel') {

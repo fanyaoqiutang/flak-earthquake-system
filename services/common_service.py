@@ -722,3 +722,105 @@ def svc_ai_chat():
             "msg": f"AI服务异常: {str(e)}",
             "data": {}
         }), 500
+
+
+def svc_simulate_earthquake_alert():
+    """模拟地震预警 - 创建真实地震数据并生成预警记录，持久化到数据库"""
+    from flask import request
+    from models import db, EarthquakeInfo, City, Province, UserSubscribeProvince, UserEarthquakeAlert, User
+    from websocket_service import check_and_push_earthquake_alert
+    import datetime as dt
+
+    data = request.get_json(force=True)
+    province_id = data.get('province_id')
+
+    if not province_id:
+        return jsonify({"code": 400, "msg": "省份ID不能为空"}), 400
+
+    try:
+        province_id = int(province_id)
+    except (ValueError, TypeError):
+        return jsonify({"code": 400, "msg": "省份ID格式错误"}), 400
+
+    province = Province.query.get(province_id)
+    if not province:
+        return jsonify({"code": 400, "msg": "省份不存在"}), 400
+
+    city = City.query.filter_by(province_id=province_id).first()
+    if not city:
+        return jsonify({"code": 400, "msg": "该省份下没有城市数据"}), 400
+
+    magnitude = float(data.get('magnitude', 5.0))
+    depth = float(data.get('depth', 10.0))
+    latitude = float(data.get('latitude', 30.0 + (hash(str(province_id)) % 10)))
+    longitude = float(data.get('longitude', 100.0 + (hash(str(province_id)) % 20)))
+    earthquake_time = dt.datetime.now()
+
+    eq = EarthquakeInfo(
+        city_id=city.city_id,
+        earthquake_time=earthquake_time,
+        latitude=latitude,
+        longitude=longitude,
+        depth=depth,
+        magnitude=magnitude,
+        earthquake_message=data.get('earthquake_message',
+                                    f"【模拟】{province.province_name}{city.city_name}发生{magnitude}级地震")
+    )
+    db.session.add(eq)
+    db.session.commit()
+
+    subscribers = UserSubscribeProvince.query.filter_by(province_id=province_id).all()
+    alert_created = False
+    current_user_alert_id = None
+    current_user_id = None
+
+    from flask_login import current_user
+    from flask import session
+    user_id = None
+    if current_user.is_authenticated:
+        user_id = current_user.user_id
+    else:
+        user_id = session.get('user_id')
+
+    for sub in subscribers:
+        existing = UserEarthquakeAlert.query.filter_by(
+            user_id=sub.user_id, earthquake_id=eq.earthquake_id
+        ).first()
+        if not existing:
+            alert_record = UserEarthquakeAlert(
+                user_id=sub.user_id,
+                earthquake_id=eq.earthquake_id,
+                is_read=False
+            )
+            db.session.add(alert_record)
+            db.session.commit()
+            alert_created = True
+
+            if sub.user_id == user_id:
+                current_user_alert_id = alert_record.id
+                current_user_id = sub.user_id
+
+    alert_data = {
+        'alert_id': current_user_alert_id,
+        'earthquake_id': eq.earthquake_id,
+        'province_name': province.province_name,
+        'city_name': city.city_name,
+        'magnitude': magnitude,
+        'latitude': latitude,
+        'longitude': longitude,
+        'depth': depth,
+        'earthquake_time': earthquake_time.strftime("%Y-%m-%d %H:%M:%S"),
+        'message': eq.earthquake_message or f"{province.province_name}{city.city_name}发生{magnitude}级地震",
+        'tip': '请尽快远离高层建筑、玻璃、悬挂物，寻找安全区域躲避！'
+    }
+
+    try:
+        check_and_push_earthquake_alert(eq.earthquake_id)
+    except Exception as e:
+        print(f"⚠️ WebSocket推送失败（不影响预警记录）: {e}")
+
+    return jsonify({
+        "code": 200,
+        "msg": "模拟预警成功",
+        "data": alert_data
+    })

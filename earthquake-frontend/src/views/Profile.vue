@@ -844,10 +844,10 @@ const loadAlertMessages = async () => {
     const response = await getAlerts()
     if (response.code === 200) {
       alertMessages.value = response.data.map(item => ({
-        id: item.id,
-        title: item.title || `地震预警 - M${item.magnitude || '未知'}`,
-        content: item.content || `${item.province_name || ''}${item.city_name || ''}发生${item.magnitude || ''}级地震`,
-        create_time: item.create_time,
+        id: item.alert_id,
+        title: `地震预警 - M${item.magnitude || '未知'}`,
+        content: `${item.province_name || ''}${item.city_name || ''}发生${item.magnitude || ''}级地震`,
+        create_time: item.earthquake_time,
         is_read: item.is_read
       }))
     }

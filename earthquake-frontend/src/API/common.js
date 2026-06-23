@@ -101,4 +101,11 @@ export function aiChat(data) {
     })
 }
 
-
+// 模拟地震预警（创建真实记录并持久化）
+export function simulateEarthquakeAlert(data) {
+    return request({
+        url: '/earthquake/simulate-alert',
+        method: 'post',
+        data
+    })
+}

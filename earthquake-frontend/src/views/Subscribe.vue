@@ -222,34 +222,8 @@
       </template>
     </el-dialog>
 
-    <!-- 地震预警弹窗 -->
-    <el-dialog
-      v-model="alertDialogVisible"
-      title="⚠️ 紧急地震预警"
-      width="500px"
-      :close-on-click-modal="false"
-      :before-close="handleAlertClose"
-    >
-      <div class="alert-content">
-        <div class="alert-main">
-          <div class="alert-title">
-            {{ currentAlert.province }} 发生 {{ currentAlert.magnitude }} 级地震
-          </div>
-          <div class="alert-details">
-            <p>🕒 时间: {{ currentAlert.time }}</p>
-            <p> 位置: {{ currentAlert.location }}</p>
-            <p>💡 提示: {{ currentAlert.tip }}</p>
-          </div>
-        </div>
-        <div class="alert-countdown">
-          <div class="countdown-text">预计到达时间</div>
-          <div class="countdown-num">{{ countdownSeconds }}秒</div>
-        </div>
-      </div>
-      <template #footer>
-        <el-button type="primary" @click="confirmAlert">我已知晓</el-button>
-      </template>
-    </el-dialog>
+    <!-- 全局预警弹窗组件 -->
+    <EarthquakeAlert ref="alertRef" />
   </div>
 </template>
 
@@ -265,7 +239,8 @@ import {
   getAlertSettings,
   updateAlertSettings
 } from '../API/user'
-import { getEarthquakeList } from '../API/common'
+import { getEarthquakeList, simulateEarthquakeAlert } from '../API/common'
+import EarthquakeAlert from '../components/EarthquakeAlert.vue'
 
 const router = useRouter()
 const dialogVisible = ref(false)
@@ -790,21 +765,32 @@ const saveSubscriptions = async () => {
   }
 }
 
-const simulateEarthquakeAlert = () => {
+const alertRef = ref(null)
+
+const simulateEarthquakeAlertFn = async () => {
   if (subscriptions.value.length === 0) return
 
   const randomSub = subscriptions.value[Math.floor(Math.random() * subscriptions.value.length)]
 
-  currentAlert.value = {
-    province: randomSub.province_name,
-    magnitude: '5.2',
-    time: new Date().toLocaleString('zh-CN'),
-    location: `${randomSub.province_name}某市`,
-    tip: '请当地居民注意防范，做好应急准备'
-  }
+  try {
+    const response = await simulateEarthquakeAlert({
+      province_id: randomSub.province_id,
+      magnitude: 5.2,
+      depth: 10,
+      latitude: 30.0 + Math.random() * 5,
+      longitude: 100.0 + Math.random() * 10,
+      earthquake_message: `【模拟演练】${randomSub.province_name}某地发生5.2级地震`
+    })
 
-  alertDialogVisible.value = true
-  startCountdown()
+    if (response.code === 200 && response.data) {
+      if (alertRef.value) {
+        alertRef.value.show(response.data)
+      }
+    }
+  } catch (error) {
+    console.error('模拟预警失败:', error)
+    ElMessage.error('模拟预警失败，请稍后重试')
+  }
 }
 
 const startCountdown = () => {
@@ -830,7 +816,7 @@ const confirmAlert = () => {
 }
 
 // 测试预警弹窗（开发用）
-const testAlert = () => {
+const testAlert = async () => {
   if (subscriptions.value.length === 0) {
     ElMessage.warning('请先订阅省份')
     return
@@ -838,29 +824,27 @@ const testAlert = () => {
 
   const randomSub = subscriptions.value[Math.floor(Math.random() * subscriptions.value.length)]
 
-  currentAlert.value = {
-    province: randomSub.province_name,
-    city: '测试市',
-    magnitude: '5.2',
-    time: new Date().toLocaleString('zh-CN'),
-    location: `${randomSub.province_name}测试市 (30.05°N, 103.00°E)`,
-    depth: 10,
-    tip: '【测试】这是预警功能测试，请当地居民注意防范，做好应急准备'
+  try {
+    const response = await simulateEarthquakeAlert({
+      province_id: randomSub.province_id,
+      magnitude: 5.2,
+      depth: 10,
+      latitude: 30.0 + Math.random() * 5,
+      longitude: 100.0 + Math.random() * 10,
+      earthquake_message: `【测试演练】${randomSub.province_name}测试市发生5.2级地震`
+    })
+
+    if (response.code === 200 && response.data) {
+      if (alertRef.value) {
+        alertRef.value.show(response.data)
+      }
+    }
+  } catch (error) {
+    console.error('测试预警失败:', error)
+    ElMessage.error('测试预警失败，请稍后重试')
   }
-
-  alertDialogVisible.value = true
-  startCountdown()
-
-  sendBrowserNotification({
-    province_name: randomSub.province_name,
-    city_name: '测试市',
-    magnitude: '5.2',
-    earthquake_time: new Date().toLocaleString('zh-CN'),
-    depth: 10
-  })
-
-  ElMessage.success('测试预警已触发')
 }
+
 </script>
 
 <style scoped>

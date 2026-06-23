@@ -87,9 +87,15 @@ import EarthquakeAlert from './components/EarthquakeAlert.vue'
 import AiFloatBall from './components/AiFloatBall.vue'
 import { userLogout, getUnreadAlertsCount } from './API/user'
 import { adminLogout } from './API/admin'
+import { io } from 'socket.io-client'
 
 const router = useRouter()
 const route = useRoute()
+
+// 全局预警弹窗
+const alertRef = ref(null)
+const alertComponentReady = ref(false)
+let socket = null
 
 // 用户信息
 const isLoggedIn = ref(false)
@@ -188,6 +194,37 @@ const checkLoginStatus = () => {
   }
 }
 
+// WebSocket连接 - 接收实时地震预警
+const connectWebSocket = () => {
+  const currentUserId = localStorage.getItem('user_id')
+  if (!currentUserId) return
+
+  try {
+    socket = io('http://localhost:5000', {
+      query: { user_id: currentUserId },
+      transports: ['websocket', 'polling']
+    })
+
+    socket.on('connect', () => {
+      console.log('✅ WebSocket已连接')
+      socket.emit('subscribe_alert', { user_id: currentUserId })
+    })
+
+    socket.on('earthquake_alert', (alertData) => {
+      console.log('🚨 收到地震预警推送:', alertData)
+      if (alertRef.value) {
+        alertRef.value.show(alertData)
+      }
+    })
+
+    socket.on('disconnect', () => {
+      console.log('❌ WebSocket已断开')
+    })
+  } catch (error) {
+    console.warn('WebSocket连接失败:', error)
+  }
+}
+
 // 监听路由变化，重新检查登录状态
 watch(() => route.path, () => {
   checkLoginStatus()
@@ -196,12 +233,20 @@ watch(() => route.path, () => {
 // 组件挂载时检查登录状态
 onMounted(() => {
   checkLoginStatus()
+  alertComponentReady.value = true
+
+  // 连接WebSocket接收实时预警
+  connectWebSocket()
 
   // 定期检查登录状态（每30秒）
   const interval = setInterval(checkLoginStatus, 30000)
 
   onBeforeUnmount(() => {
     clearInterval(interval)
+    if (socket) {
+      socket.disconnect()
+      socket = null
+    }
   })
 })
 

@@ -55,6 +55,8 @@ app.register_blueprint(user_bp)
 app.register_blueprint(common_bp)
 app.register_blueprint(admin_location_bp)
 
+# 初始化SocketIO
+init_socketio(app)
 
 # 初始化数据
 with app.app_context():
@@ -128,4 +130,4 @@ with app.app_context():
     db.session.commit()
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True, allow_unsafe_werkzeug=True)
