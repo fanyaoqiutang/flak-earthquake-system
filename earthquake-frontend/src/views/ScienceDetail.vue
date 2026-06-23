@@ -1,84 +1,102 @@
 <template>
   <div class="detail-container">
     <!-- 返回按钮 -->
-    <div class="back-btn" @click="goBack">
+    <div class="back-btn" @click="$router.back()">
       <el-icon><ArrowLeft /></el-icon>
       返回文章列表
     </div>
 
-    <div v-if="loading" class="loading">
-      <el-icon size="40"><Loading /></el-icon>
-      <p>加载中...</p>
-    </div>
-
-    <div v-else-if="article" class="article-content">
+    <div v-if="currentArticle" class="article-content">
       <div class="article-header">
-        <el-icon class="icon"><View /></el-icon>
-        <h1>{{ article.title }}</h1>
+        <h1>{{ currentArticle.title }}</h1>
         <div class="article-meta">
           <div class="meta-item">
             <el-icon><Clock /></el-icon>
-            {{ article.create_time }}
+            {{ currentArticle.year }}年
           </div>
-          <div class="meta-item">来源：{{ article.source }}</div>
+          <div class="meta-item">作者：{{ currentArticle.author }}</div>
+          <div class="meta-item">
+            <el-icon><View /></el-icon>
+            阅读 {{ currentArticle.view_count }}
+          </div>
         </div>
       </div>
       <div class="article-body">
-        <div class="content" v-html="formatContent(article.content)"></div>
+        <div class="content" v-html="currentArticle.content"></div>
       </div>
     </div>
+
+    <el-empty v-else description="文章不存在" />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, Loading, View, Clock } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
-import request from '@/API/request.js'
+import { useRoute } from 'vue-router'
+import { ArrowLeft, View, Clock } from '@element-plus/icons-vue'
+import { ref } from 'vue'
 
 const route = useRoute()
-const router = useRouter()
 
-const article = ref(null)
-const loading = ref(true)
-
-// 获取文章详情
-const fetchArticle = async () => {
-  try {
-    loading.value = true
-    const articleId = route.params.articleId
-
-    const res = await request.get(`/science/articles/${articleId}`)
-
-    if (res.code === 200) {
-      article.value = res.data
-    } else {
-      ElMessage.error('获取文章失败')
-    }
-  } catch (error) {
-    console.error('获取文章详情失败:', error)
-    ElMessage.error('网络错误，请稍后重试')
-  } finally {
-    loading.value = false
+// 和列表页完全一致的静态数据
+const allArticles = [
+  {
+    article_id: 1,
+    title: "地震发生时室内避险正确方法",
+    author: "地震预警平台",
+    year: "2026",
+    view_count: 1256,
+    content: `<h2>一、室内紧急避震要点</h2>
+<p>1. 立刻蹲、躲、护：迅速蹲在坚固桌子下方，一手抓牢桌腿，另一手护住头部颈部，远离玻璃窗、吊灯、衣柜等重物。</p>
+<p>2. 切勿乱跑：地震摇晃时不要冲向门口、阳台，墙体、玻璃极易坠落伤人。</p>
+<p>3. 远离危险区域：避开厨房（燃气管道）、阳台、落地窗、高大家具。</p>
+<h2>二、震后撤离注意事项</h2>
+<p>摇晃停止后有序撤离，走楼梯禁止乘坐电梯；撤离前关闭燃气、电源。</p>`
+  },
+  {
+    article_id: 2,
+    title: "家庭地震应急包准备清单",
+    author: "地震预警平台",
+    year: "2026",
+    view_count: 987,
+    content: `<h2>家庭应急包必备物资</h2>
+<ol>
+<li>饮用水、压缩饼干（可供3天食用）</li>
+<li>手电筒、备用电池、手摇收音机</li>
+<li>急救包：纱布、碘伏、止血棉、常用药品</li>
+<li>口哨（被困用于呼救）</li>
+<li>保暖薄毯、一次性口罩手套</li>
+</ol>
+<p>应急包放置客厅随手可拿到的位置，每半年更换一次食品与饮用水。</p>`
+  },
+  {
+    article_id: 3,
+    title: "户外遇到地震如何自救",
+    author: "地震预警平台",
+    year: "2025",
+    view_count: 763,
+    content: `<p>1. 马路边：远离高楼、广告牌、电线杆，跑到空旷平地蹲下。</p>
+<p>2. 山区：警惕滑坡、落石，向垂直山坡方向撤离。</p>
+<p>3. 河边海边：立刻向高处转移，防范地震引发海啸。</p>`
+  },
+  {
+    article_id: 4,
+    title: "不同震级地震危害科普",
+    author: "地震预警平台",
+    year: "2025",
+    view_count: 621,
+    content: `<ul>
+<li>3级以下：微弱震动，无破坏</li>
+<li>3~4.9级：室内轻微晃动，物品小幅移动</li>
+<li>5~5.9级：墙体开裂，老旧房屋受损</li>
+<li>6级以上：建筑坍塌，易造成人员伤亡</li>
+</ul>`
   }
-}
+]
 
-// 返回上一页
-const goBack = () => {
-  router.back()
-}
-
-// 格式化内容（直接返回HTML内容）
-const formatContent = (content) => {
-  if (!content) return ''
-  // 不再转换换行符，直接返回HTML内容
-  return content
-}
-
-onMounted(() => {
-  fetchArticle()
-})
+const currentArticle = ref(null)
+// 根据路由id匹配文章
+const aid = Number(route.params.articleId)
+currentArticle.value = allArticles.find(item => item.article_id === aid)
 </script>
 
 <style scoped>
@@ -89,7 +107,6 @@ onMounted(() => {
   background: #F5F7FB;
   min-height: 100vh;
 }
-
 .back-btn {
   display: inline-flex;
   align-items: center;
@@ -103,37 +120,22 @@ onMounted(() => {
   font-weight: 500;
   transition: all 0.3s;
 }
-
 .back-btn:hover {
   background: #ecf5ff;
   transform: translateX(-4px);
 }
-
-.loading {
-  text-align: center;
-  padding: 60px 0;
-  color: #909399;
-}
-
 .article-content {
   background: white;
   border-radius: 12px;
   padding: 40px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
-
 .article-header {
   text-align: center;
   margin-bottom: 32px;
   padding-bottom: 24px;
   border-bottom: 1px solid #E4E7ED;
 }
-
-.article-header .icon {
-  font-size: 60px;
-  margin-bottom: 16px;
-}
-
 .article-header h1 {
   margin: 0 0 16px 0;
   font-size: 28px;
@@ -141,7 +143,6 @@ onMounted(() => {
   font-weight: 600;
   line-height: 1.4;
 }
-
 .article-meta {
   display: flex;
   justify-content: center;
@@ -149,155 +150,41 @@ onMounted(() => {
   gap: 24px;
   color: #909399;
   font-size: 14px;
+  flex-wrap: wrap;
 }
-
 .meta-item {
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
-
-.article-summary {
-  background: #f0f7ff;
-  border-left: 4px solid #409eff;
-  padding: 20px;
-  border-radius: 8px;
-  margin-bottom: 32px;
-}
-
-.article-summary h3 {
-  margin: 0 0 12px 0;
-  color: #1E293B;
-  font-size: 18px;
-}
-
-.article-summary p {
-  margin: 0;
-  color: #606266;
-  line-height: 1.8;
-  font-size: 15px;
-}
-
-.article-body h3 {
-  margin: 0 0 20px 0;
-  color: #1E293B;
-  font-size: 18px;
-}
-
 .content {
   color: #303133;
   line-height: 2;
   font-size: 15px;
-  /* 删除 white-space: pre-wrap，让HTML正常渲染 */
 }
-
-/* 添加HTML内容的样式支持 */
+/* 富文本内容样式穿透 */
 .content :deep(p) {
   margin-bottom: 1em;
 }
-
-.content :deep(h1),
-.content :deep(h2),
-.content :deep(h3),
-.content :deep(h4),
-.content :deep(h5),
-.content :deep(h6) {
+.content :deep(h2) {
   margin-top: 1.5em;
   margin-bottom: 0.5em;
   font-weight: bold;
   color: #1E293B;
 }
-
-.content :deep(img) {
-  max-width: 100%;
-  height: auto;
-  display: block;
-  margin: 1em auto;
-}
-
-.content :deep(ul),
-.content :deep(ol) {
+.content :deep(ul), .content :deep(ol) {
   padding-left: 2em;
   margin-bottom: 1em;
 }
-
-.content :deep(table) {
-  width: 100%;
-  border-collapse: collapse;
-  margin-bottom: 1em;
-}
-
-.content :deep(table th),
-.content :deep(table td) {
-  border: 1px solid #ddd;
-  padding: 8px;
-  text-align: left;
-}
-
-.content :deep(a) {
-  color: #409eff;
-  text-decoration: none;
-}
-
-.content :deep(a:hover) {
-  text-decoration: underline;
-}
-
-/* 引用块样式 */
-.content :deep(blockquote) {
-  margin: 1.5em 0;
-  padding: 16px 20px;
-  background: #f5f7fa;
-  border-left: 4px solid #409eff;
-  border-radius: 0 8px 8px 0;
-  color: #606266;
-  font-style: italic;
-}
-
-/* 强调文本 */
-.content :deep(strong),
-.content :deep(b) {
-  color: #1E293B;
-  font-weight: 600;
-}
-
-.content :deep(em),
-.content :deep(i) {
-  color: #409eff;
-  font-style: normal;
-}
-
-/* 代码块 */
-.content :deep(code) {
-  background: #f5f7fa;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-family: 'Courier New', monospace;
-  font-size: 0.9em;
-  color: #e96900;
-}
-
-.content :deep(pre) {
-  background: #282c34;
-  color: #abb2bf;
-  padding: 16px;
-  border-radius: 8px;
-  overflow-x: auto;
-  margin: 1.5em 0;
-}
-
-.content :deep(pre code) {
-  background: transparent;
-  color: inherit;
-  padding: 0;
-}
-
-/* 分隔线 */
-.content :deep(hr) {
-  border: none;
-  height: 2px;
-  background: linear-gradient(to right, #409eff, #66b1ff);
-  margin: 2em 0;
-  border-radius: 1px;
+@media (max-width: 768px) {
+  .detail-container {
+    padding: 16px;
+  }
+  .article-content {
+    padding: 24px;
+  }
+  .article-header h1 {
+    font-size: 22px;
+  }
 }
 </style>

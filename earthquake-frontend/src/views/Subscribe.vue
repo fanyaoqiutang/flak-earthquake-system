@@ -873,6 +873,8 @@ const testAlert = () => {
   display: flex;
   gap: 20px;
   padding: 20px;
+  height: calc(100vh - 60px);
+  overflow: hidden;
 }
 
 .left-panel {
@@ -880,6 +882,14 @@ const testAlert = () => {
   display: flex;
   flex-direction: column;
   gap: 15px;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.left-panel::-webkit-scrollbar {
+  display: none;
 }
 
 .loading-wrapper {
@@ -966,6 +976,8 @@ const testAlert = () => {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  overflow-y: auto;
+  flex-shrink: 0;
 }
 
 .panel-card {

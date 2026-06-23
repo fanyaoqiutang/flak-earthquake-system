@@ -28,12 +28,6 @@ const routes = [
     component: () => import('@/views/Science.vue'),
     meta: { title: '科普中心' }
   },
-   {
-    path: '/science/category/:categoryId',
-    name: 'ScienceCategory',
-    component: () => import('@/views/ScienceCategory.vue'),
-    meta: { title: '分类详情' }
-  },
   {
     path: '/science/article/:articleId',
     name: 'ScienceDetail',

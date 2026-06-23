@@ -28,7 +28,6 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 from routes.admin_routes import admin_bp
 from routes.user_routes import user_bp
 from routes.common_routes import common_bp
-from routes.science_routes import science_bp
 from routes.admin_location_routes import admin_location_bp
 
 db.init_app(app)
@@ -54,7 +53,6 @@ def login():
 app.register_blueprint(admin_bp)
 app.register_blueprint(user_bp)
 app.register_blueprint(common_bp)
-app.register_blueprint(science_bp)
 app.register_blueprint(admin_location_bp)
 
 
